@@ -19,17 +19,21 @@ app = FastAPI(
     version="2.0.0"
 )
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+
 # Ensure directories exist (safely handle read-only serverless environments)
 try:
-    os.makedirs("static/css", exist_ok=True)
-    os.makedirs("static/js", exist_ok=True)
-    os.makedirs("static/assets/images", exist_ok=True)
-    os.makedirs("templates", exist_ok=True)
+    os.makedirs(os.path.join(STATIC_DIR, "css"), exist_ok=True)
+    os.makedirs(os.path.join(STATIC_DIR, "js"), exist_ok=True)
+    os.makedirs(os.path.join(STATIC_DIR, "assets", "images"), exist_ok=True)
+    os.makedirs(TEMPLATES_DIR, exist_ok=True)
 except Exception:
     pass
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 @app.on_event("startup")
 def on_startup():
@@ -40,9 +44,11 @@ def on_startup():
 # ==========================================
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/api/index.py", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Render main application template"""
     return templates.TemplateResponse(request=request, name="index.html", context={"now": datetime.now().year})
+
 
 
 @app.get("/api/health")
