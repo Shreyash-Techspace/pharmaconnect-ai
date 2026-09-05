@@ -92,14 +92,22 @@ function updateUserSessionUI() {
   const authBtn = document.getElementById('authBtnTrigger');
   const nameDisp = document.getElementById('userNameDisplay');
   const roleDisp = document.getElementById('userRoleDisplay');
+  const avatarEmoji = document.getElementById('userAvatarEmoji');
+
+  const navPatient = document.getElementById('navPatientBtn');
+  const navPharmacy = document.getElementById('navPharmacyBtn');
+  const navAdmin = document.getElementById('navAdminBtn');
 
   if (currentUser) {
     if (badge) badge.style.display = 'flex';
     if (authBtn) authBtn.style.display = 'none';
     if (nameDisp) nameDisp.innerText = currentUser.name;
     if (roleDisp) roleDisp.innerText = currentUser.role.toUpperCase();
+    if (avatarEmoji) {
+      avatarEmoji.innerText = currentUser.role === 'pharmacy' ? '🏥' : (currentUser.role === 'admin' ? '🛡️' : '👤');
+    }
 
-    // Update store title in pharmacy view if user is pharmacy
+    // Update store details if pharmacy
     if (currentUser.role === 'pharmacy' && currentPharmacyStore) {
       const storeName = document.getElementById('pharmStoreName');
       const storeLic = document.getElementById('pharmLicense');
@@ -111,27 +119,62 @@ function updateUserSessionUI() {
       if (storeAddr) storeAddr.innerText = currentPharmacyStore.address || 'Downtown Central';
       if (storePhone) storePhone.innerText = currentPharmacyStore.phone || '+91 98201 12345';
     }
+
+    // Role-Based Access Control for Portal Switcher Buttons
+    if (currentUser.role === 'patient') {
+      if (navPatient) navPatient.style.display = 'inline-flex';
+      if (navPharmacy) navPharmacy.style.display = 'none';
+      if (navAdmin) navAdmin.style.display = 'none';
+    } else if (currentUser.role === 'pharmacy') {
+      if (navPatient) navPatient.style.display = 'none';
+      if (navPharmacy) navPharmacy.style.display = 'inline-flex';
+      if (navAdmin) navAdmin.style.display = 'none';
+    } else if (currentUser.role === 'admin') {
+      // Admin has master access to inspect both Patient and Pharmacy portals safely
+      if (navPatient) navPatient.style.display = 'inline-flex';
+      if (navPharmacy) navPharmacy.style.display = 'inline-flex';
+      if (navAdmin) navAdmin.style.display = 'inline-flex';
+    }
   } else {
     if (badge) badge.style.display = 'none';
     if (authBtn) authBtn.style.display = 'inline-flex';
+
+    // Logged Out State: Patient Portal active; Pharmacy & Admin locked with auth prompt
+    if (navPatient) {
+      navPatient.style.display = 'inline-flex';
+      navPatient.innerHTML = '<i class="fa-solid fa-user-injured"></i> <span>Patient Portal</span>';
+    }
+    if (navPharmacy) {
+      navPharmacy.style.display = 'inline-flex';
+      navPharmacy.innerHTML = '<i class="fa-solid fa-lock" style="color:var(--amber-warning);"></i> <span>Pharmacy Portal</span>';
+    }
+    if (navAdmin) {
+      navAdmin.style.display = 'inline-flex';
+      navAdmin.innerHTML = '<i class="fa-solid fa-lock" style="color:var(--amber-warning);"></i> <span>Admin Portal</span>';
+    }
   }
 }
 
 function switchRole(role) {
-  // Access Guard: Patients access patient view. Pharmacy and Admin require logged-in session of matching role!
   const guardedRoles = ['pharmacy', 'admin'];
 
-  if (guardedRoles.includes(role)) {
-    if (!currentUser || currentUser.role !== role) {
-      alert(`⚠️ Authentication Required: Please login as a registered ${role.toUpperCase()} to access this portal.`);
+  if (!currentUser) {
+    if (guardedRoles.includes(role)) {
+      alert(`🔒 Authentication Required: Please log in as an authorized ${role.toUpperCase()} to access this portal.`);
       openAuthModal(role);
+      return;
+    }
+  } else {
+    // Role Isolation Guard: Patient cannot access Pharmacy/Admin, Pharmacy cannot access Patient/Admin (Admin can access all)
+    if (currentUser.role !== 'admin' && currentUser.role !== role) {
+      alert(`⚠️ Access Control: You are currently logged in as ${currentUser.name} (${currentUser.role.toUpperCase()}). Please log out first to switch to the ${role.toUpperCase()} portal.`);
       return;
     }
   }
 
   currentRole = role;
 
-  // Highlight active role portal button
+  // Highlight active role button
   const btnMap = { patient: 'navPatientBtn', pharmacy: 'navPharmacyBtn', admin: 'navAdminBtn' };
   ['navPatientBtn', 'navPharmacyBtn', 'navAdminBtn'].forEach(id => {
     const btn = document.getElementById(id);
@@ -142,12 +185,12 @@ function switchRole(role) {
     if (activeBtn) activeBtn.classList.add('active');
   }
 
-  // Toggle view visibility
+  // Toggle views
   document.querySelectorAll('.view-module').forEach(mod => mod.style.display = 'none');
   const targetView = document.getElementById(`${role}View`);
   if (targetView) targetView.style.display = 'block';
 
-  // Trigger role-specific data reloads
+  // Trigger role data loading
   if (role === 'patient') loadPatientOrders();
   if (role === 'pharmacy') {
     switchPharmacySubTab('orders');
@@ -156,6 +199,7 @@ function switchRole(role) {
   }
   if (role === 'admin') loadAdminData();
 }
+
 
 // Sub-Tab Switchers for Consolidated Dashboards
 function switchPharmacySubTab(tabName) {
@@ -195,6 +239,61 @@ function openAuthModal(targetRole = null) {
     }
   }
 }
+
+async function quickLoginDemo(role) {
+  const credentials = {
+    patient: { email: 'rahul@pharmaconnect.ai', pass: 'PatientPass@123' },
+    pharmacy: { email: 'apollo@pharmaconnect.ai', pass: 'PharmaPass@123' },
+    admin: { email: 'admin@pharmaconnect.ai', pass: 'AdminPass@123' }
+  };
+
+  if (!credentials[role]) return;
+
+  const select = document.getElementById('loginRoleSelect');
+  const emailInput = document.getElementById('loginEmail');
+  const passInput = document.getElementById('loginPassword');
+
+  if (select) select.value = role;
+  if (emailInput) emailInput.value = credentials[role].email;
+  if (passInput) passInput.value = credentials[role].pass;
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: credentials[role].email,
+        password: credentials[role].pass,
+        role: role
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'OTP_REQUIRED') {
+      const res2 = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: credentials[role].email,
+          password: credentials[role].pass,
+          otp_code: data.otp_demo || '123456',
+          role: role
+        })
+      });
+      const data2 = await res2.json();
+      if (res2.ok && data2.status === 'SUCCESS') {
+        completeUserLogin(data2);
+        return;
+      }
+    } else if (res.ok && data.status === 'SUCCESS') {
+      completeUserLogin(data);
+    } else {
+      alert(`❌ ${data.detail || 'Quick demo login failed.'}`);
+    }
+  } catch (err) {
+    alert("Quick login error.");
+  }
+}
+
 
 function closeAuthModal() {
   const modal = document.getElementById('authModal');
@@ -1004,6 +1103,16 @@ async function uploadPrescriptionFile(e) {
 // ==========================================
 
 function addToCart(medId, medName, genericName, price, pharmacyId, pharmacyName) {
+  if (!currentUser) {
+    alert("🔒 Authentication Required: Please sign in or create a Patient account to add medicines to cart and place orders securely.");
+    openAuthModal('patient');
+    return;
+  }
+  if (currentUser.role !== 'patient' && currentUser.role !== 'admin') {
+    alert("⚠️ Patient Access Only: Only logged-in Patient accounts can add items to cart and place orders.");
+    return;
+  }
+
   const existing = cart.find(c => c.med_id === medId && c.pharmacy_id === pharmacyId);
   if (existing) {
     existing.quantity += 1;
@@ -1034,6 +1143,11 @@ function updateCartBadge() {
 }
 
 function openCartModal() {
+  if (!currentUser) {
+    alert("🔒 Authentication Required: Please log in as a Patient to view your shopping cart and checkout.");
+    openAuthModal('patient');
+    return;
+  }
   const modal = document.getElementById('cartModal');
   if (!modal) return;
 
@@ -1092,17 +1206,27 @@ function removeFromCart(index) {
 
 async function handleCartCheckout(e) {
   e.preventDefault();
+  if (!currentUser) {
+    alert("🔒 Authentication Required: Please log in as a Patient to place medicine orders.");
+    openAuthModal('patient');
+    return;
+  }
+  if (currentUser.role !== 'patient' && currentUser.role !== 'admin') {
+    alert("⚠️ Access Denied: Only Patient accounts can checkout and place orders.");
+    return;
+  }
   if (cart.length === 0) {
     alert("Your cart is empty.");
     return;
   }
 
-  const patientId = currentUser ? currentUser.id : "USR-PAT-001";
-  const patientName = currentUser ? currentUser.name : "Rahul Sharma";
-  const patientPhone = currentUser ? (currentUser.phone || "+91 98201 99887") : "+91 98201 99887";
-  const address = document.getElementById('cartAddress').value || "Flat 402, Sunshine Heights";
+  const patientId = currentUser.id;
+  const patientName = currentUser.name;
+  const patientPhone = currentUser.phone || "+91 98201 99887";
+  const address = document.getElementById('cartAddress').value || currentUser.address || "Flat 402, Sunshine Heights";
   const pharmacyId = document.getElementById('cartPharmacySelect').value || cart[0].pharmacy_id;
   const deliveryType = document.getElementById('cartDeliveryType').value || "DELIVERY";
+
 
   const cartItemsPayload = cart.map(item => ({
     med_id: item.med_id,

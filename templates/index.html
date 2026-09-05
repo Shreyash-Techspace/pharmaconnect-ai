@@ -752,7 +752,26 @@
           </div>
 
           <button type="submit" class="btn btn-primary" style="width: 100%;">Proceed to OTP Verification <i class="fa-solid fa-arrow-right"></i></button>
+
+          <!-- 1-Click Quick Demo Role Switcher -->
+          <div style="margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border-color);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px; text-align: center;">
+              ⚡ 1-Click Quick Demo Login (Fast Evaluation)
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="quickLoginDemo('patient')" style="flex: 1; padding: 6px; font-size: 12px;">
+                👤 Patient
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="quickLoginDemo('pharmacy')" style="flex: 1; padding: 6px; font-size: 12px;">
+                🏪 Pharmacy
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="quickLoginDemo('admin')" style="flex: 1; padding: 6px; font-size: 12px;">
+                🛡️ Admin
+              </button>
+            </div>
+          </div>
         </div>
+
 
         <!-- STEP 2: 6-DIGIT OTP VERIFICATION -->
         <div id="loginStep2Container" style="display: none; text-align: center;">
