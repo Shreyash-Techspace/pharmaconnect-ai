@@ -80,10 +80,16 @@
           <i class="fa-solid fa-tower-cell"></i>
         </button>
 
+        <!-- Intro Tour Trigger -->
+        <button class="icon-control-btn" onclick="openIntroSplash()" title="Play Platform Introduction & Animated Tour" style="color:var(--medical-blue);">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </button>
+
         <!-- Theme Toggle -->
         <button class="icon-control-btn" onclick="toggleTheme()" id="themeToggleBtn" title="Toggle Light/Dark Theme">
           <i class="fa-solid fa-moon"></i>
         </button>
+
 
         <!-- User Logged-in Session Badge -->
         <div class="user-session-badge" id="userSessionBadge" style="display: none; font-size: 13px; font-weight: 600; background: var(--bg-subtle); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-color); align-items: center; gap: 8px;">
@@ -1203,7 +1209,51 @@
     </div>
   </footer>
 
+  <!-- Animated Intro Splash & Platform Tour Overlay -->
+  <div class="intro-splash-overlay" id="introSplashOverlay" style="display: none;">
+    <div class="intro-splash-card">
+      <div class="intro-brand-badge">
+        <i class="fa-solid fa-heart-pulse"></i> Pharma-Connect AI Platform Introduction
+      </div>
+      
+      <h2 class="intro-title">Next-Gen Intelligent Healthcare & Medicine Ecosystem</h2>
+      <p class="intro-subtitle">
+        Bridging patients, retail pharmacies, ICU hospitals, and 24/7 emergency delivery riders into a unified real-time healthcare intelligence network.
+      </p>
+
+      <div class="intro-grid">
+        <div class="intro-feature-box">
+          <div class="intro-feature-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+          <div class="intro-feature-title">Real-Time Inventory</div>
+          <div class="intro-feature-desc">Locate live medicine availability & price variations across nearby licensed chemists.</div>
+        </div>
+
+        <div class="intro-feature-box">
+          <div class="intro-feature-icon"><i class="fa-solid fa-brain"></i></div>
+          <div class="intro-feature-title">AI OCR & Analytics</div>
+          <div class="intro-feature-desc">Instant prescription scanning, generic substitute comparator, and demand forecasting.</div>
+        </div>
+
+        <div class="intro-feature-box">
+          <div class="intro-feature-icon"><i class="fa-solid fa-truck-medical"></i></div>
+          <div class="intro-feature-title">24/7 Emergency Dispatch</div>
+          <div class="intro-feature-desc">GPS dispatch tracking for critical ICU medicines & hospital bulk reservations.</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn-intro-cta" onclick="closeIntroSplash(); openAuthModal();">
+          <i class="fa-solid fa-right-to-bracket"></i> Login / Register Portal
+        </button>
+        <button class="btn btn-secondary" onclick="closeIntroSplash();" style="padding: 14px 28px; border-radius: 30px; font-weight: 700;">
+          Explore Platform Demo <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Application Logic Scripts -->
   <script src="/static/js/app.js"></script>
 </body>
 </html>
+

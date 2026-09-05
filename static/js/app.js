@@ -17,7 +17,98 @@ let pharmacyOrdersCache = [];
 let patientOrdersCache = [];
 let activePharmacyOrderFilter = 'ALL';
 
+// ==========================================
+// ANIMATED TOAST NOTIFICATION ENGINE
+// ==========================================
+function showToast(title, message, type = 'info', iconOverride = null) {
+  let container = document.getElementById('toastNotificationContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastNotificationContainer';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const iconMap = {
+    success: 'fa-solid fa-circle-check',
+    error: 'fa-solid fa-circle-xmark',
+    warning: 'fa-solid fa-triangle-exclamation',
+    info: 'fa-solid fa-circle-info'
+  };
+
+  const iconClass = iconOverride || iconMap[type] || iconMap.info;
+
+  const card = document.createElement('div');
+  card.className = `toast-card ${type}`;
+  card.innerHTML = `
+    <div class="toast-icon"><i class="${iconClass}"></i></div>
+    <div class="toast-content">
+      <div class="toast-title">${title}</div>
+      <div class="toast-msg">${message}</div>
+    </div>
+    <button class="toast-close-btn" onclick="this.parentElement.remove()">&times;</button>
+  `;
+
+  container.appendChild(card);
+
+  setTimeout(() => {
+    card.style.animation = 'toastFadeOut 0.3s forwards';
+    setTimeout(() => {
+      if (card.parentNode) card.parentNode.removeChild(card);
+    }, 300);
+  }, 3500);
+}
+
+// Global Browser Alert Interceptor for Animated Toasts
+window.alert = function(msg) {
+  if (typeof msg !== 'string') msg = String(msg);
+  let title = "System Notification";
+  let type = "info";
+  if (msg.includes("❌") || msg.includes("Error") || msg.includes("Failed") || msg.includes("Denied")) {
+    title = "Action Required";
+    type = "error";
+  } else if (msg.includes("🎉") || msg.includes("✅") || msg.includes("Added") || msg.includes("Success")) {
+    title = "Success";
+    type = "success";
+  } else if (msg.includes("🔒") || msg.includes("⚠️") || msg.includes("Required")) {
+    title = "Authentication & Security";
+    type = "warning";
+  }
+
+  const cleanMsg = msg.replace(/[❌🎉✅🔒⚠️🛒]/g, '').trim();
+  showToast(title, cleanMsg, type);
+};
+
+// ==========================================
+// ANIMATED INTRO SPLASH OVERLAY CONTROLLER
+// ==========================================
+function openIntroSplash() {
+  const overlay = document.getElementById('introSplashOverlay');
+  if (overlay) overlay.style.display = 'flex';
+}
+
+function closeIntroSplash() {
+  const overlay = document.getElementById('introSplashOverlay');
+  if (overlay) {
+    overlay.style.animation = 'fadeOut 0.3s forwards';
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      overlay.style.animation = '';
+    }, 300);
+  }
+}
+
+// Auto open intro splash on first visit in session
+document.addEventListener('DOMContentLoaded', () => {
+  const introSeen = sessionStorage.getItem('pharma_intro_seen');
+  if (!introSeen) {
+    setTimeout(openIntroSplash, 600);
+    sessionStorage.setItem('pharma_intro_seen', 'true');
+  }
+});
+
 // i18n Translations Dictionary
+
 const TRANSLATIONS = {
   en: {
     hero_title: "Find Medicines Faster. <span>Deliver Care Smarter.</span>",
