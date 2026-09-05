@@ -5,7 +5,20 @@ import uuid
 import random
 from datetime import datetime
 
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DB = os.path.join(BASE_DIR, "database.db")
+
+# In Vercel serverless environment, root directory is read-only. Use /tmp directory.
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    DB_FILE = "/tmp/database.db"
+    if os.path.exists(DEFAULT_DB) and not os.path.exists(DB_FILE):
+        try:
+            import shutil
+            shutil.copy2(DEFAULT_DB, DB_FILE)
+        except Exception:
+            pass
+else:
+    DB_FILE = DEFAULT_DB
 
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
