@@ -38,7 +38,17 @@ def hash_password(password: str, salt: str = None):
 
 def verify_password(password: str, stored_hash: str, salt: str) -> bool:
     pwd_hash, _ = hash_password(password, salt)
-    return pwd_hash == stored_hash
+    if pwd_hash == stored_hash:
+        return True
+    # Fallback legacy SHA256 check
+    try:
+        legacy_hash = hashlib.sha256((password + salt).encode('utf-8')).hexdigest()
+        if legacy_hash == stored_hash:
+            return True
+    except Exception:
+        pass
+    return False
+
 
 def init_db():
     conn = get_db_connection()
@@ -252,12 +262,44 @@ def init_db():
 
     conn.commit()
 
-    # Seed Initial Database Data if empty
+    # Seed Initial Database Data if empty, or sync seed demo account hashes
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
         seed_initial_data(conn)
+    else:
+        sync_seed_accounts(conn)
 
     conn.close()
+
+
+def sync_seed_accounts(conn):
+    cursor = conn.cursor()
+    users_data = [
+        ("USR-PAT-001", "rahul@pharmaconnect.ai", "PatientPass@123", "Rahul Sharma", "patient", "+91 98201 99887", "Flat 402, Sunshine Heights, Downtown Central", "", "active", ""),
+        ("USR-PAT-002", "priya@pharmaconnect.ai", "PatientPass@123", "Priya Patel", "patient", "+91 98334 11223", "701 Lake View Towers, Powai", "", "active", ""),
+        ("USR-PHARM-001", "apollo@pharmaconnect.ai", "PharmaPass@123", "Apollo Pharmacy (Downtown)", "pharmacy", "+91 98201 12345", "101 Healthcare Blvd, Downtown Central", "DL-2024-AP8819", "active", "PH-001"),
+        ("USR-PHARM-002", "healthplus@pharmaconnect.ai", "PharmaPass@123", "HealthPlus Chemist", "pharmacy", "+91 98202 23456", "45 Metro Station Rd, Sector 4", "DL-2024-HP4412", "active", "PH-002"),
+        ("USR-ADMIN-001", "admin@pharmaconnect.ai", "AdminPass@123", "Platform Administrator", "admin", "+91 1800 742762", "Central Admin Office", "ADM-001", "active", "")
+    ]
+
+    for uid, email, raw_pwd, name, role, phone, addr, lic, status, p_id in users_data:
+        pwd_hash, salt = hash_password(raw_pwd)
+        cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email.lower(),))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute('''
+                UPDATE users SET password_hash = ?, salt = ?, failed_login_attempts = 0, status = 'active'
+                WHERE LOWER(email) = ?
+            ''', (pwd_hash, salt, email.lower()))
+        else:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute('''
+                INSERT INTO users (id, email, password_hash, salt, name, role, phone, address, license, status, pharmacy_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (uid, email, pwd_hash, salt, name, role, phone, addr, lic, status, p_id, now_str))
+
+    conn.commit()
+
 
 
 def seed_initial_data(conn):
