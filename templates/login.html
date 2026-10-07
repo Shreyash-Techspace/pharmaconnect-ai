@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Pharma-Connect AI | Secure Healthcare Platform</title>
+  <meta name="description"
+    content="Securely log in to Pharma-Connect AI. Access your patient, pharmacy, or admin portal with 2FA OTP verification.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- EmailJS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <style>
+    :root {
+      --blue: #0ea5e9;
+      --blue-dark: #0284c7;
+      --blue-glow: rgba(14, 165, 233, 0.25);
+      --green: #10b981;
+      --rose: #f43f5e;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+      --bg: #030712;
+      --bg-card: rgba(255, 255, 255, 0.04);
+      --bg-card-hover: rgba(255, 255, 255, 0.07);
+      --border: rgba(255, 255, 255, 0.10);
+      --border-glow: rgba(14, 165, 233, 0.40);
+      --text: #f1f5f9;
+      --text-muted: #64748b;
+      --text-sub: #94a3b8;
+      --shadow-glow: 0 0 40px rgba(14, 165, 233, 0.15);
+      --font-head: 'Outfit', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --transition: all 0.2s ease;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: stretch;
+      overflow: hidden;
+    }
+
+    /* ── Animated background ── */
+    .bg-mesh {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background: radial-gradient(ellipse 80% 60% at 20% -20%, rgba(14, 165, 233, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 100%, rgba(139, 92, 246, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 60% 50%, rgba(16, 185, 129, 0.07) 0%, transparent 60%);
+    }
+
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* ── Layout ── */
+    .page-layout {
+      display: flex;
+      width: 100%;
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Left panel — branding ── */
+    .brand-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px;
+      position: relative;
+    }
+
+    .brand-logo-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 56px;
+    }
+
+    .brand-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: white;
+      box-shadow: 0 0 24px var(--blue-glow);
+    }
+
+    .brand-name {
+      font-family: var(--font-head);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-name span {
+      color: var(--blue);
+    }
+
+    .brand-headline {
+      font-family: var(--font-head);
+      font-size: clamp(2.4rem, 4vw, 3.2rem);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      margin-bottom: 20px;
+    }
+
+    .brand-headline .hl {
+      color: var(--blue);
+    }
+
+    .brand-sub {
+      font-size: 16px;
+      color: var(--text-sub);
+      line-height: 1.7;
+      max-width: 420px;
+      margin-bottom: 48px;
+    }
+
+    .feature-pills {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .feature-pill {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      backdrop-filter: blur(10px);
+      transition: var(--transition);
+    }
+
+    .feature-pill:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-glow);
+    }
+
+    .pill-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .pill-icon.blue {
+      background: rgba(14, 165, 233, 0.15);
+      color: var(--blue);
+    }
+
+    .pill-icon.green {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+    }
+
+    .pill-icon.rose {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--rose);
+    }
+
+    .pill-icon.purple {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--purple);
+    }
+
+    .pill-title {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .pill-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ── Right panel — auth card ── */
+    .auth-panel {
+      width: 480px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      overflow-y: auto;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .auth-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(14, 165, 233, 0.12);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    .auth-title {
+      font-family: var(--font-head);
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .auth-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── Tab switcher ── */
+    .tab-switcher {
+      display: flex;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 24px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .tab-btn.active {
+      background: var(--blue-dark);
+      color: white;
+      box-shadow: 0 2px 12px var(--blue-glow);
+    }
+
+    /* ── Form elements ── */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      transition: var(--transition);
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--blue);
+      background: rgba(14, 165, 233, 0.06);
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .input-wrapper .form-input {
+      padding-left: 42px;
+    }
+
+    .eye-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      transition: var(--transition);
+    }
+
+    .eye-btn:hover {
+      color: var(--text);
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .form-select option {
+      background: #1e293b;
+    }
+
+    /* ── OTP box ── */
+    .otp-box {
+      background: rgba(14, 165, 233, 0.06);
+      border: 1px solid rgba(14, 165, 233, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .otp-box .shield-icon {
+      font-size: 36px;
+      color: var(--blue);
+      margin-bottom: 10px;
+    }
+
+    .otp-box h4 {
+      font-family: var(--font-head);
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .otp-box p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .otp-email {
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    .otp-alert {
+      margin-top: 10px;
+      padding: 6px 14px;
+      background: rgba(16, 185, 129, 0.12);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--green);
+      display: none;
+    }
+
+    .otp-input-large {
+      width: 180px !important;
+      text-align: center;
+      font-size: 28px !important;
+      font-weight: 900 !important;
+      letter-spacing: 8px;
+      padding: 14px !important;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      box-shadow: 0 4px 20px var(--blue-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px var(--blue-glow);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      padding: 9px 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-sub);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.10);
+      color: var(--text);
+    }
+
+    /* ── Demo login section ── */
+    .demo-section {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.10);
+    }
+
+    .demo-label {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+
+    .demo-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .demo-btn {
+      flex: 1;
+      padding: 9px 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-sub);
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .demo-btn:hover {
+      background: rgba(14, 165, 233, 0.10);
+      border-color: var(--border-glow);
+      color: var(--blue);
+    }
+
+    /* ── Divider ── */
+    .row-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+
+    .forgot-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .forgot-link:hover {
+      text-decoration: underline;
+    }
+
+    .remember-me {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    /* ── Toast ── */
+    #loginToastContainer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .l-toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      min-width: 300px;
+      backdrop-filter: blur(20px);
+      animation: toastIn 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .l-toast.success {
+      border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .l-toast.error {
+      border-color: rgba(244, 63, 94, 0.4);
+    }
+
+    .l-toast.info {
+      border-color: rgba(14, 165, 233, 0.4);
+    }
+
+    .l-toast-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .l-toast.success .l-toast-icon {
+      color: var(--green);
+    }
+
+    .l-toast.error .l-toast-icon {
+      color: var(--rose);
+    }
+
+    .l-toast.info .l-toast-icon {
+      color: var(--blue);
+    }
+
+    .l-toast-title {
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .l-toast-msg {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ── Password strength ── */
+    .pwd-strength-bar {
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.08);
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .pwd-strength-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: all 0.3s ease;
+      width: 0%;
+    }
+
+    .pwd-strength-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .brand-panel {
+        display: none;
+      }
+
+      .auth-panel {
+        width: 100%;
+        border: none;
+      }
+    }
+
+    /* ── Spinner ── */
+    .fa-spinner {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="bg-mesh"></div>
+  <div class="bg-grid"></div>
+
+  <div class="page-layout">
+
+    <!-- ── Left: Branding Panel ── -->
+    <div class="brand-panel">
+      <div class="brand-logo-mark">
+        <div class="brand-icon"><i class="fa-solid fa-heart-pulse"></i></div>
+        <div class="brand-name">Pharma-Connect <span>AI</span></div>
+      </div>
+
+      <h1 class="brand-headline">
+        Healthcare Intelligence<br>
+        <span class="hl">Reimagined</span> for India
+      </h1>
+      <p class="brand-sub">
+        Connect patients, pharmacies, hospitals and emergency riders in a unified real-time network. Find medicines,
+        verify prescriptions, and dispatch care — all in minutes.
+      </p>
+
+      <div class="feature-pills">
+        <div class="feature-pill">
+          <div class="pill-icon blue"><i class="fa-solid fa-map-location-dot"></i></div>
+          <div>
+            <div class="pill-title">Live Pharmacy Map</div>
+            <div class="pill-desc">Real-time stock across nearby stores with Google Maps</div>
+          </div>
+        </div>
+        <div class="feature-pill">
+          <div class="pill-icon rose"><i class="fa-solid fa-truck-medical"></i></div>
+          <div>
+            <div class="pill-title">24/7 Emergency Dispatch</div>
+            <div class="pill-desc">Critical medicines at your door within minutes</div>
+          </div>
+        </div>
+        <div class="feature-pill">
+          <div class="pill-icon purple"><i class="fa-solid fa-brain"></i></div>
+          <div>
+            <div class="pill-title">AI OCR Prescriptions</div>
+            <div class="pill-desc">Upload your doctor's note — AI extracts medicines instantly</div>
+          </div>
+        </div>
+        <div class="feature-pill">
+          <div class="pill-icon green"><i class="fa-solid fa-shield-halved"></i></div>
+          <div>
+            <div class="pill-title">2FA OTP Security</div>
+            <div class="pill-desc">Real OTP sent to your registered email for every login</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right: Auth Panel ── -->
+    <div class="auth-panel">
+      <div class="auth-card">
+
+        <div class="auth-header">
+          <div class="auth-badge"><i class="fa-solid fa-lock"></i> SECURE PORTAL ACCESS</div>
+          <h2 class="auth-title" id="authTitle">Welcome Back</h2>
+          <p class="auth-subtitle" id="authSubtitle">Sign in to access your healthcare dashboard</p>
+        </div>
+
+        <!-- Tab Switcher -->
+        <div class="tab-switcher">
+          <button class="tab-btn active" id="tabLogin" onclick="switchLoginTab('login')">
+            <i class="fa-solid fa-right-to-bracket"></i> Login
+          </button>
+          <button class="tab-btn" id="tabRegister" onclick="switchLoginTab('register')">
+            <i class="fa-solid fa-user-plus"></i> Register
+          </button>
+        </div>
+
+        <!-- ── LOGIN FORM ── -->
+        <div id="loginSection">
+
+          <!-- Step 1: Credentials -->
+          <div id="loginStep1">
+            <form onsubmit="handleLoginStep1(event)">
+              <div class="form-group">
+                <label class="form-label">Portal Role</label>
+                <select id="loginRole" class="form-select">
+                  <option value="patient">👤 Patient / General Public</option>
+                  <option value="pharmacy">🏪 Pharmacy Store Owner</option>
+                  <option value="hospital">🏥 Hospital / ICU Officer</option>
+                  <option value="delivery">🚚 Delivery Partner</option>
+                  <option value="admin">🛡️ System Administrator</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-envelope input-icon"></i>
+                  <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-lock input-icon"></i>
+                  <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required>
+                  <button type="button" class="eye-btn" onclick="toggleEye('loginPassword', this)">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="row-between">
+                <label class="remember-me">
+                  <input type="checkbox" id="rememberMe" checked> Remember me
+                </label>
+                <a href="javascript:void(0)" class="forgot-link" onclick="showForgotSection()">Forgot Password?</a>
+              </div>
+
+              <button type="submit" class="btn-primary" id="loginStep1Btn">
+                <i class="fa-solid fa-arrow-right"></i> Continue to OTP
+              </button>
+
+              <!-- Demo logins -->
+              <div class="demo-section">
+                <div class="demo-label">⚡ Quick Demo Login (1-Click)</div>
+                <div class="demo-btns">
+                  <button type="button" class="demo-btn" onclick="quickDemoLogin('patient')">👤 Patient</button>
+                  <button type="button" class="demo-btn" onclick="quickDemoLogin('pharmacy')">🏪 Pharmacy</button>
+                  <button type="button" class="demo-btn" onclick="quickDemoLogin('admin')">🛡️ Admin</button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Step 2: OTP Verification -->
+          <div id="loginStep2" style="display:none;">
+            <div class="otp-box">
+              <div class="shield-icon"><i class="fa-solid fa-shield-halved"></i></div>
+              <h4>Enter 6-Digit OTP</h4>
+              <p>A security code was sent to<br><span class="otp-email" id="otpTargetEmail">your email</span></p>
+              <div class="otp-alert" id="otpDemoAlert"></div>
+            </div>
+
+            <div class="form-group" style="text-align:center;">
+              <input type="text" id="otpInput" class="form-input otp-input-large" placeholder="------" maxlength="6"
+                autocomplete="one-time-code">
+            </div>
+
+            <button type="button" class="btn-primary" id="verifyOtpBtn" onclick="handleLoginStep2()">
+              <i class="fa-solid fa-shield-halved"></i> Verify OTP & Sign In
+            </button>
+
+            <div style="display:flex; justify-content:space-between; margin-top:14px;">
+              <button type="button" class="btn-secondary" onclick="backToStep1()">
+                <i class="fa-solid fa-arrow-left"></i> Back
+              </button>
+              <button type="button" class="btn-secondary" onclick="resendOtp()" id="resendBtn">
+                <i class="fa-solid fa-rotate"></i> Resend OTP
+              </button>
+            </div>
+          </div>
+
+          <!-- Forgot Password -->
+          <div id="forgotSection" style="display:none;">
+            <div class="otp-box" style="background:rgba(245,158,11,0.06); border-color:rgba(245,158,11,0.2);">
+              <div class="shield-icon" style="color:var(--amber);"><i class="fa-solid fa-key"></i></div>
+              <h4>Reset Password</h4>
+              <p style="color:var(--text-muted);">Enter your email — we'll send a reset OTP</p>
+            </div>
+            <div id="forgotStep1">
+              <form onsubmit="handleForgotSend(event)">
+                <div class="form-group">
+                  <label class="form-label">Registered Email</label>
+                  <div class="input-wrapper">
+                    <i class="fa-solid fa-envelope input-icon"></i>
+                    <input type="email" id="forgotEmail" class="form-input" placeholder="you@example.com" required>
+                  </div>
+                </div>
+                <button type="submit" class="btn-primary">
+                  <i class="fa-solid fa-paper-plane"></i> Send Reset OTP
+                </button>
+              </form>
+            </div>
+            <div id="forgotStep2" style="display:none; margin-top:16px;">
+              <form onsubmit="handleForgotReset(event)">
+                <div class="form-group">
+                  <label class="form-label">6-Digit OTP</label>
+                  <input type="text" id="forgotOtpCode" class="form-input" placeholder="123456" maxlength="6" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">New Password</label>
+                  <div class="input-wrapper">
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <input type="password" id="forgotNewPwd" class="form-input" placeholder="••••••••" required>
+                  </div>
+                </div>
+                <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Reset Password</button>
+              </form>
+            </div>
+            <div style="margin-top:14px; text-align:center;">
+              <button class="btn-secondary" onclick="showLoginSection()">← Back to Login</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── REGISTER FORM ── -->
+        <div id="registerSection" style="display:none;">
+          <form onsubmit="handleRegister(event)">
+            <div class="form-group">
+              <label class="form-label">Account Type</label>
+              <select id="regRole" class="form-select" onchange="togglePharmacyField()">
+                <option value="patient">👤 Patient / General Public</option>
+                <option value="pharmacy">🏪 Pharmacy Store Owner</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-user input-icon"></i>
+                <input type="text" id="regName" class="form-input" placeholder="Your full name" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-envelope input-icon"></i>
+                <input type="email" id="regEmail" class="form-input" placeholder="you@example.com" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone Number</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-phone input-icon"></i>
+                <input type="text" id="regPhone" class="form-input" placeholder="+91 98000 00000" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-lock input-icon"></i>
+                <input type="password" id="regPassword" class="form-input" placeholder="••••••••" required
+                  oninput="checkPwdStrength(this.value)">
+                <button type="button" class="eye-btn" onclick="toggleEye('regPassword', this)">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+              <div class="pwd-strength-bar">
+                <div class="pwd-strength-fill" id="pwdFill"></div>
+              </div>
+              <div class="pwd-strength-text" id="pwdText">Enter password</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Street Address / Store Location</label>
+              <input type="text" id="regAddress" class="form-input"
+                placeholder="e.g. Station Road, Palghar West, Maharashtra" required>
+            </div>
+            <div id="regPharmacyFields" style="display:none;">
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-certificate"></i> Drug License No. (DL No.)</label>
+                <input type="text" id="regLicense" class="form-input" placeholder="DL-2026-AP1234">
+              </div>
+
+              <!-- Pharmacy GPS Location Pinning -->
+              <div class="form-group"
+                style="background: rgba(14, 165, 233, 0.07); border: 1px dashed rgba(14, 165, 233, 0.4); border-radius: 8px; padding: 12px; margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label class="form-label" style="margin: 0; font-weight: 700; color: #0284c7;">
+                    <i class="fa-solid fa-map-location-dot"></i> Store GPS Location Pin
+                  </label>
+                  <span
+                    style="background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px;">Map
+                    Visible</span>
+                </div>
+                <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
+                  Your store will be visible to Patients & Admins on the live medicine map and nearby medical stores
+                  directory.
+                </p>
+
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                  <button type="button" class="btn-secondary" onclick="detectStoreLocation()"
+                    style="font-size: 12px; padding: 6px 12px; flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <i class="fa-solid fa-crosshairs" style="color:#0284c7;"></i> Detect Current GPS
+                  </button>
+                  <button type="button" class="btn-secondary" onclick="setDemoStoreLocationPalghar()"
+                    style="font-size: 12px; padding: 6px 12px; flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <i class="fa-solid fa-city" style="color:#10b981;"></i> Palghar Demo
+                  </button>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div>
+                    <label style="font-size: 11px; color: #64748b; font-weight:600;">Latitude</label>
+                    <input type="number" step="0.00001" id="regLat" class="form-input" placeholder="19.6967"
+                      style="font-size: 12px; padding: 6px 10px;">
+                  </div>
+                  <div>
+                    <label style="font-size: 11px; color: #64748b; font-weight:600;">Longitude</label>
+                    <input type="number" step="0.00001" id="regLng" class="form-input" placeholder="72.7699"
+                      style="font-size: 12px; padding: 6px 10px;">
+                  </div>
+                </div>
+                <div id="storeLocationStatus"
+                  style="font-size: 11px; color: #0284c7; margin-top: 6px; font-weight: 600;">
+                  📍 Selected: Palghar, Maharashtra (Demo Area)
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn-primary" id="regBtn">
+              <i class="fa-solid fa-user-plus"></i> Create Account
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast container -->
+  <div id="loginToastContainer"></div>
+
+  <!-- Config + Login JS -->
+  <script src="/static/js/config.js"></script>
+  <script src="/static/js/login.js"></script>
+</body>
+
+</html>

@@ -13,8 +13,8 @@
   
   <!-- FontAwesome / Lucide Icon Set -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Leaflet Map CSS & JS -->
+
+  <!-- Leaflet Map (OpenStreetMap — always works, no API key needed) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
@@ -24,9 +24,42 @@
   <!-- QRCode JS for Digital Receipts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
+  <!-- EmailJS SDK (real OTP delivery) -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <!-- App Config (API keys) — MUST load before app.js -->
+  <script src="/static/js/config.js"></script>
+
+  <!-- Auth Guard: redirect to /login if not logged in -->
+  <script>
+    (function(){
+      if (!localStorage.getItem('pharma_user')) {
+        window.location.replace('/login');
+      }
+    })();
+  </script>
+
   <!-- Global Application Styles -->
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/components.css">
+
+  <!-- Google Maps: loaded ONLY when a valid API key is configured -->
+  <!-- Map falls back to Leaflet/OpenStreetMap if no key is set     -->
+  <script>
+    window._gmapsLoaded = false;
+    document.addEventListener('DOMContentLoaded', function() {
+      var cfg = window.APP_CONFIG || {};
+      var key = cfg.GOOGLE_MAPS_API_KEY || '';
+      if (key && key !== 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
+        window._gmapsLoaded = true;
+        var s = document.createElement('script');
+        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + key + '&callback=initGoogleMap&libraries=marker';
+        s.async = true; s.defer = true;
+        document.head.appendChild(s);
+      }
+      // If no key: initMap() in app.js will use Leaflet automatically
+    });
+  </script>
 </head>
 <body>
 
@@ -256,18 +289,104 @@
         </div>
 
         <!-- Real-Time Availability Heatmap Preview Card -->
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">
-              <i class="fa-solid fa-map-location-dot" style="color:var(--emerald-green);"></i> Medicine Availability Map & Shortage Heatmap
-            </h3>
-            <span class="badge badge-green">Live Map</span>
+        <div class="card" style="grid-column: 1 / -1; margin-bottom: 30px;" id="healthcareMapSection">
+          <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 4px;">
+                <i class="fa-solid fa-map-location-dot" style="color:var(--emerald-green);"></i> Surrounding Medical Stores & Hospitals Map
+              </h3>
+              <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
+                Live availability of pharmacies, critical formulations, and emergency ICU hospitals around your location.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <span class="badge badge-green"><i class="fa-solid fa-satellite-dish"></i> Live GPS Feed</span>
+              <span class="badge badge-blue" id="activeLocationBadge">📍 Palghar, Maharashtra (Demo)</span>
+            </div>
           </div>
-          <div id="leafletMap" class="map-container"></div>
-          <div class="heatmap-legend">
-            <div><span class="legend-dot green"></span> High Stock Available</div>
-            <div><span class="legend-dot yellow"></span> Low Stock (Reserves Low)</div>
-            <div><span class="legend-dot red"></span> Shortage Zone</div>
+
+          <!-- Location Bar & Filter Controls -->
+          <div class="map-toolbar" style="background: var(--bg-subtle); padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">
+                <i class="fa-solid fa-location-crosshairs" style="color:var(--medical-blue);"></i> User Location:
+              </span>
+              <button class="btn btn-secondary" onclick="detectUserLocation(true)" style="padding: 5px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-crosshairs text-sky"></i> Detect My GPS
+              </button>
+              <button class="btn btn-secondary" onclick="setDemoLocationPalghar(true)" style="padding: 5px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-city" style="color:var(--emerald-green);"></i> Palghar Demo
+              </button>
+            </div>
+
+            <!-- Category Filter Pills -->
+            <div class="map-filters" style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button class="pill-tag active-filter" id="filterAllBtn" onclick="filterFacilities('all')">
+                All (<span id="countAllFacilities">0</span>)
+              </button>
+              <button class="pill-tag" id="filterPharmBtn" onclick="filterFacilities('pharmacy')">
+                🏪 Medical Stores (<span id="countPharmacies">0</span>)
+              </button>
+              <button class="pill-tag" id="filterHospBtn" onclick="filterFacilities('hospital')">
+                🏥 Hospitals & ICU (<span id="countHospitals">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- Map Element -->
+          <div id="googleMapContainer" class="map-container" style="position:relative; height: 400px; border-radius: 10px; border: 1px solid var(--border-color); overflow: hidden;"></div>
+
+          <!-- Map Status Legend -->
+          <div class="heatmap-legend" style="margin-top: 12px; margin-bottom: 20px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; font-weight: 600;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#10b981;"></span> Medical Store (In Stock)
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#f59e0b;"></span> Medical Store (Low Stock)
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#ef4444;"></span> Shortage Zone
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#3b82f6;"></span> Hospital & 24/7 ICU
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#0284c7; box-shadow:0 0 0 3px rgba(2,132,199,0.3);"></span> Your Location
+            </div>
+          </div>
+
+          <!-- SURROUNDING HEALTHCARE FACILITIES LIST BELOW MAP -->
+          <div class="nearby-facilities-section" style="border-top: 1px solid var(--border-color); padding-top: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+              <div>
+                <h4 style="font-size: 16px; font-weight: 800; margin: 0; display:flex; align-items:center; gap:8px;">
+                  <i class="fa-solid fa-compass" style="color:var(--medical-blue);"></i> Surrounding Medical Stores & Hospitals Around You
+                </h4>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">
+                  Live distance calculated from your current / demo location (<span id="userLocationNameDisplay">Palghar, Maharashtra</span>)
+                </p>
+              </div>
+
+              <!-- Search/Sort Inside Nearby Facilities -->
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="facilitySearchInput" placeholder="Filter by name or street..." oninput="handleFacilitySearch(this.value)"
+                       style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); min-width: 200px;">
+                <select id="facilitySortSelect" onchange="handleFacilitySort(this.value)"
+                        style="padding: 6px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-primary);">
+                  <option value="distance">Nearest Distance</option>
+                  <option value="rating">Highest Rated</option>
+                  <option value="name">Name (A-Z)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Facilities Cards Grid Container -->
+            <div id="nearbyFacilitiesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
+              <!-- Populated dynamically via app.js -->
+              <div style="text-align:center; padding:30px; color:var(--text-muted); grid-column:1/-1;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;"></i> Loading surrounding healthcare facilities...
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -356,10 +475,10 @@
         <div class="flex-between" style="flex-wrap: wrap; gap: 16px;">
           <div>
             <h2 class="card-title" id="pharmacyStoreTitle">
-              <i class="fa-solid fa-clinic-medical" style="color:var(--medical-blue);"></i> <span id="pharmStoreName">Apollo Pharmacy - Downtown</span>
+              <i class="fa-solid fa-clinic-medical" style="color:var(--medical-blue);"></i> <span id="pharmStoreName">Apollo Pharmacy - Palghar Station</span>
             </h2>
             <p style="font-size: 14px; color: var(--text-secondary);" id="pharmStoreSub">
-              License: <strong id="pharmLicense">DL-2024-AP8819</strong> | Address: <span id="pharmAddress">101 Healthcare Blvd, Downtown Central</span> | Phone: <span id="pharmPhone">+91 98201 12345</span>
+              License: <strong id="pharmLicense">DL-2024-AP8819</strong> | Address: <span id="pharmAddress">Station Road, Palghar West, Maharashtra - 401404</span> | Phone: <span id="pharmPhone">+91 98201 12345</span>
             </p>
           </div>
           <div style="display:flex; gap:10px; flex-wrap: wrap;">
@@ -663,14 +782,16 @@
             <div id="pendingPharmaciesList"></div>
           </div>
 
-          <div class="card">
-            <h3 class="card-title" style="margin-bottom: 16px;"><i class="fa-solid fa-circle-check" style="color:var(--emerald-green);"></i> Active Authorized Pharmacies</h3>
+          <div class="card" style="grid-column: 1 / -1;">
+            <h3 class="card-title" style="margin-bottom: 16px;"><i class="fa-solid fa-circle-check" style="color:var(--emerald-green);"></i> Active Authorized Pharmacies & Store Locations</h3>
             <div style="overflow-x: auto;">
               <table class="custom-table">
                 <thead>
                   <tr>
                     <th>Store Name</th>
                     <th>Drug License</th>
+                    <th>Location / Address</th>
+                    <th>GPS Coordinates</th>
                     <th>Phone</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -704,6 +825,75 @@
   <button class="cart-floating-btn" id="cartFloatingBtn" onclick="openCartModal()" style="position: fixed; bottom: 24px; right: 24px; z-index: 999; background: var(--medical-blue); color: white; border: none; padding: 12px 20px; border-radius: 30px; font-weight: 700; box-shadow: var(--shadow-lg); cursor: pointer; display: flex; align-items: center; gap: 10px; transition: var(--transition-fast);">
     <i class="fa-solid fa-cart-shopping" style="font-size: 18px;"></i> My Cart (<span id="cartCountBadge">0</span>)
   </button>
+
+  <!-- ========================================================================= -->
+  <!-- EMERGENCY DISPATCH MODAL -->
+  <!-- ========================================================================= -->
+  <div class="modal-overlay" id="emergencyModal">
+    <div class="modal-card" style="max-width:540px; border-top: 4px solid var(--rose-danger);">
+      <button class="modal-close-btn" onclick="closeEmergencyModal()">&times;</button>
+
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:52px; margin-bottom:8px;">🚨</div>
+        <h2 style="font-family:var(--font-heading); color:var(--rose-danger); font-size:22px;">Emergency Medicine Dispatch</h2>
+        <p style="font-size:13px; color:var(--text-secondary); margin-top:6px;">An available rider will be dispatched to the nearest 24/7 pharmacy immediately.</p>
+      </div>
+
+      <form id="emergencyForm" onsubmit="handleEmergencySubmit(event)">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div>
+            <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">Your Name *</label>
+            <input type="text" id="emgPatientName" class="search-input" placeholder="Full Name" required
+                   style="border:1px solid var(--border-color); padding:10px 14px; border-radius:8px; width:100%;">
+          </div>
+          <div>
+            <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">Mobile Number *</label>
+            <input type="text" id="emgPhone" class="search-input" placeholder="+91 98000 00000" required
+                   style="border:1px solid var(--border-color); padding:10px 14px; border-radius:8px; width:100%;">
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">Medicine / Medical Need *</label>
+          <input type="text" id="emgMedicine" class="search-input"
+                 placeholder="e.g. Insulin Glargine, Cetirizine, Inhaler" required
+                 style="border:1px solid var(--border-color); padding:10px 14px; border-radius:8px; width:100%;">
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">Delivery Address / Location *</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="emgAddress" class="search-input"
+                   placeholder="Street, Landmark, City" required
+                   style="border:1px solid var(--border-color); padding:10px 14px; border-radius:8px; flex:1;">
+            <button type="button" onclick="detectEmergencyLocation()" class="btn btn-secondary"
+                    style="padding:10px 12px; white-space:nowrap; font-size:12px;">
+              <i class="fa-solid fa-location-crosshairs"></i> My Location
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label style="font-size:13px; font-weight:700; display:block; margin-bottom:4px;">Nearest Pharmacy (Auto-Selected)</label>
+          <select id="emgPharmacy" class="search-input"
+                  style="border:1px solid var(--border-color); padding:10px 14px; border-radius:8px; width:100%; font-weight:600;">
+            <option value="PH-001">🏥 Apollo Pharmacy - Palghar Station (0.25 km) — 24/7 Open</option>
+            <option value="PH-002">🏥 Sanjivani Medical & General Stores (0.32 km) — 24/7 Open</option>
+            <option value="HOSP-001">🏥 Palghar District Civil Hospital (0.95 km) — 24/7 Trauma</option>
+          </select>
+        </div>
+
+        <!-- Dispatch Result (shown after submit) -->
+        <div id="emergencyResult" style="display:none; margin-bottom:16px;"></div>
+
+        <button type="submit" class="btn btn-emergency" id="emgSubmitBtn"
+                style="width:100%; padding:14px; font-size:15px; font-weight:800; border-radius:10px;">
+          <i class="fa-solid fa-truck-medical"></i> 🚨 DISPATCH EMERGENCY RIDER NOW
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- ========================================================================= -->
   <!-- MODAL OVERLAYS -->
@@ -890,8 +1080,44 @@
         </div>
 
         <div id="regPharmacyFields" style="margin-bottom: 12px; display: none;">
-          <label style="font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px; color:var(--medical-blue);">Drug License Number (DL No.)</label>
-          <input type="text" id="regLicense" class="search-input" placeholder="DL-2026-AP1234" style="border:1px solid var(--border-color); padding:8px 12px; border-radius:8px; width:100%;">
+          <div style="margin-bottom: 8px;">
+            <label style="font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px; color:var(--medical-blue);">
+              <i class="fa-solid fa-certificate"></i> Drug License Number (DL No.)
+            </label>
+            <input type="text" id="regLicense" class="search-input" placeholder="DL-2026-AP1234" style="border:1px solid var(--border-color); padding:8px 12px; border-radius:8px; width:100%;">
+          </div>
+
+          <!-- Pharmacy Location Pinning -->
+          <div style="background: rgba(14, 165, 233, 0.08); border: 1px dashed rgba(14, 165, 233, 0.35); border-radius: 8px; padding: 12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span style="font-size:12px; font-weight:700; color:var(--medical-blue);"><i class="fa-solid fa-map-pin"></i> Pharmacy Store Location</span>
+              <span class="badge badge-blue" style="font-size:10px;">Visible on Map</span>
+            </div>
+            <p style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
+              Your store location will be pinned on the live medicine availability map and patient directory.
+            </p>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="detectInAppStoreLocation()" style="font-size: 11px; padding: 4px 8px; flex:1;">
+                <i class="fa-solid fa-crosshairs text-sky"></i> Detect Current GPS
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="setInAppStoreLocationPalghar()" style="font-size: 11px; padding: 4px 8px; flex:1;">
+                <i class="fa-solid fa-city" style="color:var(--emerald-green);"></i> Palghar Demo
+              </button>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+              <div>
+                <label style="font-size:10px; color:var(--text-muted); font-weight:600;">Latitude</label>
+                <input type="number" step="0.00001" id="regLatInApp" class="search-input" placeholder="19.6967" style="border:1px solid var(--border-color); padding:4px 8px; font-size:11px; width:100%;">
+              </div>
+              <div>
+                <label style="font-size:10px; color:var(--text-muted); font-weight:600;">Longitude</label>
+                <input type="number" step="0.00001" id="regLngInApp" class="search-input" placeholder="72.7699" style="border:1px solid var(--border-color); padding:4px 8px; font-size:11px; width:100%;">
+              </div>
+            </div>
+            <div id="inAppLocationStatus" style="font-size:11px; color:var(--medical-blue); margin-top:4px; font-weight:600;">
+              📍 Palghar, Maharashtra coordinates selected
+            </div>
+          </div>
         </div>
 
         <div style="margin-bottom: 16px; font-size: 12px;">
@@ -902,6 +1128,74 @@
 
         <button type="submit" class="btn btn-primary" style="width: 100%;">Create Secure Account & Register</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Dedicated Medical Facility (Store / Hospital) Medicine Catalog Modal -->
+  <div class="modal-overlay" id="facilityMedicinesModal">
+    <div class="modal-card" style="max-width: 900px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px;">
+      
+      <!-- Modal Header -->
+      <div style="padding: 20px 24px; background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%); border-bottom: 1px solid var(--border-color); position: relative;">
+        <button class="modal-close-btn" onclick="closeFacilityMedicinesModal()" style="top: 16px; right: 18px; font-size:24px;">&times;</button>
+        <div style="display: flex; align-items: flex-start; gap: 16px;">
+          <div id="facMedIconContainer" style="width: 52px; height: 52px; border-radius: 12px; background: rgba(2, 132, 199, 0.12); color: var(--medical-blue); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+            <i class="fa-solid fa-clinic-medical"></i>
+          </div>
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <h2 id="facMedFacilityName" style="font-family: var(--font-heading); font-size: 22px; font-weight: 800; margin: 0; color: var(--text-primary);">
+                Medical Facility Name
+              </h2>
+              <span id="facMedTypeBadge" class="badge badge-green" style="font-size: 11px;">🏪 Medical Store</span>
+              <span id="facMedRatingBadge" style="font-size: 13px; color: #f59e0b; font-weight: 700;"><i class="fa-solid fa-star"></i> 4.8</span>
+            </div>
+            <div id="facMedDetails" style="font-size: 12px; color: var(--text-secondary); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+              <span id="facMedAddress"><i class="fa-solid fa-location-dot" style="color:var(--medical-blue);"></i> Address</span>
+              <span id="facMedPhone"><i class="fa-solid fa-phone" style="color:var(--medical-blue);"></i> +91 98200 00000</span>
+              <span id="facMedStockBadge" class="badge badge-blue" style="font-size: 11px;"><i class="fa-solid fa-boxes-stacked"></i> 20 Meds in Stock</span>
+              <span id="facMedDeliveryBadge" style="color:var(--emerald-green); font-weight:700;"><i class="fa-solid fa-truck-fast"></i> Express Delivery</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search & Category Filters Bar -->
+      <div style="padding: 14px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px;">
+        <div style="position: relative;">
+          <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 12px; color: var(--text-muted); font-size: 14px;"></i>
+          <input type="text" id="facilityMedSearchInput" class="search-input" placeholder="Search medicines by brand name, formulation, category, or symptoms..." oninput="filterFacilityMedicines()" style="width: 100%; padding-left: 38px; border-radius: 8px; font-size: 13px;">
+        </div>
+        <div id="facMedCategoryChips" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin;">
+          <!-- Dynamically populated category chips -->
+        </div>
+      </div>
+
+      <!-- Medicines Scrollable Grid -->
+      <div id="facilityMedicinesContainer" style="padding: 18px 24px; overflow-y: auto; flex: 1; min-height: 280px; max-height: 480px; background: var(--bg-subtle);">
+        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+          <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 28px; color: var(--medical-blue);"></i>
+          <p style="margin-top: 10px; font-size: 14px;">Loading medicine catalog from store database...</p>
+        </div>
+      </div>
+
+      <!-- Bottom Bar -->
+      <div style="padding: 14px 24px; background: var(--bg-card); border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);" id="facMedCartSummary">
+            🛒 Cart: 0 items for this facility
+          </div>
+          <span style="font-size: 12px; color: var(--text-muted);">•</span>
+          <span style="font-size: 15px; font-weight: 800; color: var(--emerald-green);" id="facMedCartTotal">₹ 0.00</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="closeFacilityMedicinesModal()" style="padding: 8px 16px; font-size: 13px;">Close</button>
+          <button class="btn btn-primary" onclick="proceedToCheckoutFromFacility()" style="padding: 8px 20px; font-size: 13px; font-weight: 700;">
+            <i class="fa-solid fa-cart-shopping"></i> Checkout with This Facility
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -924,12 +1218,21 @@
       </div>
 
       <form onsubmit="handleCartCheckout(event)">
-        <div style="margin-bottom: 12px;">
-          <label style="font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px;">Fulfilling Pharmacy Store</label>
-          <select id="cartPharmacySelect" class="search-input" style="border:1px solid var(--border-color); padding:8px 12px; border-radius:8px; width:100%; font-weight:600;">
-            <option value="PH-001">Apollo Pharmacy - Downtown (0.8 km)</option>
-            <option value="PH-002">HealthPlus Chemist - Metro Hub (1.4 km)</option>
-            <option value="PH-003">Wellness Medicos - Green Park (2.1 km)</option>
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px;">Fulfilling Medical Facility</label>
+          <div id="cartFulfillingBanner" style="background:var(--bg-subtle); border:1px solid var(--border-color); padding:10px 14px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div id="cartFulfillingStoreName" style="font-weight:800; font-size:14px; color:var(--text-primary);">
+                🏪 Selected Facility
+              </div>
+              <div id="cartFulfillingStoreDetails" style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                Verified Healthcare Partner • Express Dispatch
+              </div>
+            </div>
+            <span class="badge badge-green" id="cartFulfillingBadge">Selected</span>
+          </div>
+          <select id="cartPharmacySelect" class="search-input" onchange="onCartPharmacySelectChanged()" style="border:1px solid var(--border-color); padding:8px 12px; border-radius:8px; width:100%; font-weight:600;">
+            <!-- Populated dynamically with all pharmacies & hospitals -->
           </select>
         </div>
 
@@ -1011,8 +1314,129 @@
     </div>
   </div>
 
+  <!-- Dedicated Instant Edit Medicine Price Modal (Pharmacy View) -->
+  <div class="modal-overlay" id="editPriceModal">
+    <div class="modal-card" style="max-width: 460px; animation: modalPop 0.25s ease-out;">
+      <button class="modal-close-btn" onclick="closeEditPriceModal()">&times;</button>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.1); color:var(--medical-blue); display:flex; align-items:center; justify-content:center; font-size:18px;">
+          <i class="fa-solid fa-tags"></i>
+        </div>
+        <div>
+          <h2 style="font-family: var(--font-heading); margin:0; font-size:18px;">Update SKU Price</h2>
+          <p style="font-size: 12px; color: var(--text-secondary); margin:0;">Live selling price update across patient search</p>
+        </div>
+      </div>
+
+      <div style="background:var(--bg-subtle); border-radius:10px; padding:12px 14px; margin-bottom:16px; border:1px solid var(--border-color);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div id="editPriceMedName" style="font-weight:700; font-size:15px; color:var(--text-primary); margin-bottom:2px;">-</div>
+            <div id="editPriceMedGeneric" style="font-size:12px; color:var(--text-muted);">-</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-size:11px; color:var(--text-muted); display:block;">Current MRP</span>
+            <strong id="editPriceCurrentDisplay" style="color:var(--emerald-green); font-size:15px;">₹ 0.00</strong>
+          </div>
+        </div>
+      </div>
+
+      <form id="editPriceForm" onsubmit="handleEditPriceSubmit(event)">
+        <input type="hidden" id="editPriceMedId">
+        <input type="hidden" id="editPriceStoreId">
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 13px; font-weight: 700; display: block; margin-bottom: 6px;">New Selling Price (₹)</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <span style="position:absolute; left:14px; font-weight:700; color:var(--text-secondary); font-size:16px;">₹</span>
+            <input type="number" step="0.5" min="1" max="10000" id="editPriceInput" required
+                   style="border:2px solid var(--medical-blue); padding:10px 14px 10px 32px; border-radius:8px; width:100%; font-size:18px; font-weight:700; color:var(--text-primary); background:var(--bg-surface);">
+          </div>
+        </div>
+
+        <!-- Quick Price Adjustment Presets -->
+        <div style="margin-bottom: 18px;">
+          <label style="font-size: 11px; font-weight: 600; color:var(--text-muted); display: block; margin-bottom: 6px;">QUICK ADJUSTMENTS</label>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="adjustEditPrice(-10)">- ₹10</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="adjustEditPrice(-5)">- ₹5</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="adjustEditPrice(5)">+ ₹5</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="adjustEditPrice(10)">+ ₹10</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="adjustEditPrice(20)">+ ₹20</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="roundEditPrice()">Round Up</button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeEditPriceModal()">Cancel</button>
+          <button type="submit" id="editPriceSaveBtn" class="btn btn-primary" style="flex:2; font-weight:700;">
+            <i class="fa-solid fa-check"></i> Save New Price
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Refill Stock Modal (Pharmacy View) -->
+  <div class="modal-overlay" id="quickRefillModal">
+    <div class="modal-card" style="max-width: 440px; animation: modalPop 0.25s ease-out;">
+      <button class="modal-close-btn" onclick="closeQuickRefillModal()">&times;</button>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+        <div style="width:40px; height:40px; border-radius:10px; background:rgba(16,185,129,0.1); color:var(--emerald-green); display:flex; align-items:center; justify-content:center; font-size:18px;">
+          <i class="fa-solid fa-boxes-stacked"></i>
+        </div>
+        <div>
+          <h2 style="font-family: var(--font-heading); margin:0; font-size:18px;">Refill Stock Inventory</h2>
+          <p style="font-size: 12px; color: var(--text-secondary); margin:0;">Add units to store stock instantly</p>
+        </div>
+      </div>
+
+      <div style="background:var(--bg-subtle); border-radius:10px; padding:12px 14px; margin-bottom:16px; border:1px solid var(--border-color);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div id="quickRefillMedName" style="font-weight:700; font-size:15px; color:var(--text-primary);">-</div>
+            <div id="quickRefillCategory" style="font-size:12px; color:var(--text-muted);">-</div>
+          </div>
+          <div style="text-align:right;">
+            <span style="font-size:11px; color:var(--text-muted); display:block;">Current Stock</span>
+            <strong id="quickRefillCurrentStock" style="color:var(--medical-blue); font-size:15px;">0 Units</strong>
+          </div>
+        </div>
+      </div>
+
+      <form id="quickRefillForm" onsubmit="handleQuickRefillSubmit(event)">
+        <input type="hidden" id="quickRefillMedId">
+        <input type="hidden" id="quickRefillStoreId">
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 13px; font-weight: 700; display: block; margin-bottom: 6px;">Units to Add</label>
+          <input type="number" min="1" max="5000" id="quickRefillQtyInput" value="50" required
+                 style="border:2px solid var(--emerald-green); padding:10px 14px; border-radius:8px; width:100%; font-size:18px; font-weight:700; color:var(--text-primary); background:var(--bg-surface);">
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label style="font-size: 11px; font-weight: 600; color:var(--text-muted); display: block; margin-bottom: 6px;">QUICK QUANTITY</label>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="setRefillQty(25)">+25</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="setRefillQty(50)">+50</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="setRefillQty(100)">+100</button>
+            <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;" onclick="setRefillQty(200)">+200</button>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeQuickRefillModal()">Cancel</button>
+          <button type="submit" id="quickRefillSaveBtn" class="btn btn-primary" style="flex:2; font-weight:700; background:var(--emerald-green); border-color:var(--emerald-green);">
+            <i class="fa-solid fa-plus"></i> Confirm Refill
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 4. Edit Store Profile & Onboarding Settings Modal -->
   <div class="modal-overlay" id="storeProfileModal">
+
     <div class="modal-card" style="max-width: 500px;">
       <button class="modal-close-btn" onclick="closeStoreProfileModal()">&times;</button>
       <h2 style="font-family: var(--font-heading); margin-bottom: 6px;">

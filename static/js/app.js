@@ -252,7 +252,7 @@ function switchRole(role) {
   if (!currentUser) {
     if (guardedRoles.includes(role)) {
       alert(`🔒 Authentication Required: Please log in as an authorized ${role.toUpperCase()} to access this portal.`);
-      openAuthModal(role);
+      window.location.href = '/login';
       return;
     }
   } else {
@@ -436,6 +436,71 @@ function toggleRoleRegisterFields() {
   const pharmFields = document.getElementById('regPharmacyFields');
   if (pharmFields) {
     pharmFields.style.display = (role === 'pharmacy') ? 'block' : 'none';
+    if (role === 'pharmacy') {
+      const latInput = document.getElementById('regLatInApp');
+      if (latInput && !latInput.value) {
+        setInAppStoreLocationPalghar();
+      }
+    }
+  }
+}
+
+function detectInAppStoreLocation() {
+  const statusEl = document.getElementById('inAppLocationStatus');
+  const latInput = document.getElementById('regLatInApp');
+  const lngInput = document.getElementById('regLngInApp');
+  const addrInput = document.getElementById('regAddress');
+
+  if (!navigator.geolocation) {
+    if (statusEl) statusEl.innerText = '⚠️ Geolocation not supported by your browser.';
+    return;
+  }
+
+  if (statusEl) statusEl.innerText = '📡 Detecting GPS coordinates...';
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const lat = parseFloat(pos.coords.latitude.toFixed(5));
+      const lng = parseFloat(pos.coords.longitude.toFixed(5));
+      if (latInput) latInput.value = lat;
+      if (lngInput) lngInput.value = lng;
+      if (statusEl) statusEl.innerHTML = `✅ GPS Captured: <strong>${lat}, ${lng}</strong>`;
+
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+        .then(r => r.json())
+        .then(d => {
+          if (addrInput && (!addrInput.value || addrInput.value.includes('Address') || addrInput.value.includes('Palghar'))) {
+            addrInput.value = d.display_name || `${lat}, ${lng}`;
+          }
+        })
+        .catch(() => {});
+    },
+    err => {
+      if (statusEl) statusEl.innerText = '⚠️ Could not fetch GPS. Switched to Palghar demo coordinates.';
+      setInAppStoreLocationPalghar();
+    },
+    { timeout: 8000 }
+  );
+}
+
+function setInAppStoreLocationPalghar() {
+  const latInput = document.getElementById('regLatInApp');
+  const lngInput = document.getElementById('regLngInApp');
+  const addrInput = document.getElementById('regAddress');
+  const statusEl = document.getElementById('inAppLocationStatus');
+
+  const jitterLat = (Math.random() - 0.5) * 0.008;
+  const jitterLng = (Math.random() - 0.5) * 0.008;
+  const palgharLat = parseFloat((19.6967 + jitterLat).toFixed(5));
+  const palgharLng = parseFloat((72.7699 + jitterLng).toFixed(5));
+
+  if (latInput) latInput.value = palgharLat;
+  if (lngInput) lngInput.value = palgharLng;
+  if (addrInput && (!addrInput.value || addrInput.value === 'Address')) {
+    addrInput.value = 'Station Road, Palghar West, Maharashtra - 401404';
+  }
+  if (statusEl) {
+    statusEl.innerHTML = `📍 Demo: <strong>Palghar, Maharashtra (${palgharLat}, ${palgharLng})</strong>`;
   }
 }
 
@@ -622,11 +687,19 @@ async function handleUserRegister(e) {
   const secQuestion = document.getElementById('regSecQuestion') ? document.getElementById('regSecQuestion').value : '';
   const secAnswer = document.getElementById('regSecAnswer') ? document.getElementById('regSecAnswer').value : '';
 
+  const latVal = document.getElementById('regLatInApp') ? parseFloat(document.getElementById('regLatInApp').value) : null;
+  const lngVal = document.getElementById('regLngInApp') ? parseFloat(document.getElementById('regLngInApp').value) : null;
+
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, role, phone, address, license, avatar, security_question: secQuestion, security_answer: secAnswer })
+      body: JSON.stringify({
+        name, email, password, role, phone, address, license,
+        avatar, security_question: secQuestion, security_answer: secAnswer,
+        lat: !isNaN(latVal) ? latVal : null,
+        lng: !isNaN(lngVal) ? lngVal : null
+      })
     });
 
     const data = await res.json();
@@ -640,6 +713,8 @@ async function handleUserRegister(e) {
       updateUserSessionUI();
       closeAuthModal();
       alert(`🎉 ${data.message}`);
+      // Refresh facilities and map so newly registered pharmacy immediately appears!
+      _loadFacilitiesData();
       switchRole(currentUser.role);
     } else {
       alert(`❌ ${data.detail || 'Registration failed.'}`);
@@ -654,9 +729,9 @@ function logoutUser() {
   currentPharmacyStore = null;
   localStorage.removeItem('pharma_user');
   localStorage.removeItem('pharma_store');
-  updateUserSessionUI();
-  alert("Logged out successfully.");
-  switchRole('patient');
+  localStorage.removeItem('pharma_cart');
+  // Redirect to dedicated login page
+  window.location.replace('/login');
 }
 
 // Forgot Password Flow
@@ -919,47 +994,1073 @@ async function fetchStats() {
 }
 
 // ==========================================
-// LEAFLET MAP ENGINE
+// MAP ENGINE — Leaflet (default) + Google Maps (optional upgrade)
 // ==========================================
 
+// ==========================================
+// HEALTHCARE MAP ENGINE & SURROUNDING FACILITIES
+// (Medical Stores + Emergency Hospitals with Palghar Demo)
+// ==========================================
+
+let _googleMap       = null;
+let _leafletMap      = null;
+let _googleMarkers   = [];
+let _leafletMarkers  = [];
+let _leafletUserMarker = null;
+let _markerMapById   = {}; // map facility.id -> marker for easy focus
+
+let _userCoords = { lat: 19.6967, lng: 72.7699 }; // Palghar, Maharashtra demo default
+let _userLocationName = "Palghar, Maharashtra (Demo Area)";
+let _allFacilities = [];
+let _activeCategory = "all";
+let _facilitySearchTerm = "";
+let _facilitySortTerm = "distance";
+
+// ── Default map: Leaflet + OpenStreetMap (no API key required) ──────────────
 function initMap() {
-  const mapDiv = document.getElementById('leafletMap');
-  if (!mapDiv) return;
+  const container = document.getElementById('googleMapContainer');
+  if (!container) return;
 
-  mapInstance = L.map('leafletMap').setView([19.0760, 72.8777], 13);
+  // Retrieve any stored location from localStorage
+  try {
+    const saved = localStorage.getItem('pharma_user_location');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.lat && parsed.lng) {
+        _userCoords = { lat: parsed.lat, lng: parsed.lng };
+        _userLocationName = parsed.name || _userLocationName;
+      }
+    }
+  } catch(e) {}
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors | Pharma-Connect AI'
-  }).addTo(mapInstance);
+  updateLocationUI(_userLocationName);
 
-  const mockPharmacies = [
-    { name: "Apollo Pharmacy - Downtown", lat: 19.0760, lng: 72.8777, stockStatus: "high", doloStock: 140 },
-    { name: "HealthPlus Chemist - Metro Hub", lat: 19.0820, lng: 72.8820, stockStatus: "high", doloStock: 90 },
-    { name: "Wellness Medicos - Green Park", lat: 19.0680, lng: 72.8650, stockStatus: "high", doloStock: 210 },
-    { name: "CareFirst Pharmacy - Station Rd", lat: 19.0910, lng: 72.8900, stockStatus: "out", doloStock: 0 },
-    { name: "Lifeline Healthcare - City Center", lat: 19.0550, lng: 72.8500, stockStatus: "high", doloStock: 300 }
+  // If Google Maps API key is configured, initGoogleMap() will be called by script callback
+  if (window._gmapsLoaded) return;
+
+  if (!_leafletMap) {
+    _leafletMap = L.map('googleMapContainer').setView([_userCoords.lat, _userCoords.lng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> | Pharma-Connect AI'
+    }).addTo(_leafletMap);
+  }
+
+  // Load both Medical Stores and Hospitals around user location
+  _loadFacilitiesData();
+}
+
+function updateLocationUI(locName) {
+  const badge = document.getElementById('activeLocationBadge');
+  const nameDisp = document.getElementById('userLocationNameDisplay');
+  if (badge) badge.innerHTML = `📍 ${locName}`;
+  if (nameDisp) nameDisp.innerText = locName;
+}
+
+// ── Geolocation & Demo Handlers ─────────────────────────────────────────────
+
+function detectUserLocation(isUserClick = false) {
+  const badge = document.getElementById('activeLocationBadge');
+  if (badge) badge.innerHTML = `📡 Detecting your GPS location...`;
+
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser. Defaulting to Palghar, Maharashtra demo location.");
+    setDemoLocationPalghar();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      _userCoords = {
+        lat: parseFloat(pos.coords.latitude.toFixed(5)),
+        lng: parseFloat(pos.coords.longitude.toFixed(5))
+      };
+
+      // Reverse geocode via OpenStreetMap Nominatim
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${_userCoords.lat}&lon=${_userCoords.lng}&format=json`)
+        .then(r => r.json())
+        .then(d => {
+          const area = d.address ? (d.address.city || d.address.town || d.address.suburb || d.address.county || 'Your Area') : 'Current Location';
+          _userLocationName = `${area} (${_userCoords.lat.toFixed(3)}, ${_userCoords.lng.toFixed(3)})`;
+          updateLocationUI(_userLocationName);
+          localStorage.setItem('pharma_user_location', JSON.stringify({ lat: _userCoords.lat, lng: _userCoords.lng, name: _userLocationName }));
+        })
+        .catch(() => {
+          _userLocationName = `Current GPS (${_userCoords.lat.toFixed(3)}, ${_userCoords.lng.toFixed(3)})`;
+          updateLocationUI(_userLocationName);
+        });
+
+      if (_leafletMap) {
+        _leafletMap.setView([_userCoords.lat, _userCoords.lng], 14);
+      }
+      if (_googleMap) {
+        _googleMap.setCenter(_userCoords);
+      }
+
+      _loadFacilitiesData();
+      if (isUserClick) {
+        // notification feedback
+        const notif = document.getElementById('ruralBanner');
+        if (notif) {
+          notif.innerHTML = `📍 <strong>Location Detected:</strong> Showing surrounding medical stores & hospitals near you!`;
+          notif.style.display = 'block';
+          setTimeout(() => { if (notif) notif.style.display = 'none'; }, 4000);
+        }
+      }
+    },
+    err => {
+      console.warn("Geolocation permission not granted or error, using Palghar demo:", err);
+      if (isUserClick) {
+        alert("Location access was denied or timed out. Switched to Palghar, Maharashtra demo location.");
+      }
+      setDemoLocationPalghar();
+    },
+    { timeout: 8000 }
+  );
+}
+
+function setDemoLocationPalghar(isUserClick = false) {
+  _userCoords = { lat: 19.6967, lng: 72.7699 };
+  _userLocationName = "Palghar, Maharashtra (Demo Area)";
+  updateLocationUI(_userLocationName);
+  localStorage.setItem('pharma_user_location', JSON.stringify({ lat: _userCoords.lat, lng: _userCoords.lng, name: _userLocationName }));
+
+  if (_leafletMap) {
+    _leafletMap.setView([_userCoords.lat, _userCoords.lng], 14);
+  }
+  if (_googleMap) {
+    _googleMap.setCenter(_userCoords);
+  }
+
+  _loadFacilitiesData();
+}
+
+// ── Load Facilities Data from API ───────────────────────────────────────────
+
+async function _loadFacilitiesData() {
+  try {
+    const res = await fetch(`/api/facilities?lat=${_userCoords.lat}&lng=${_userCoords.lng}&category=all`);
+    const data = await res.json();
+
+    if (data.facilities && data.facilities.length > 0) {
+      _allFacilities = data.facilities;
+    } else {
+      _allFacilities = _getStaticPalgharFacilities();
+    }
+
+    // Update facility count badges
+    const allEl  = document.getElementById('countAllFacilities');
+    const phEl   = document.getElementById('countPharmacies');
+    const hoEl   = document.getElementById('countHospitals');
+    if (allEl) allEl.innerText = _allFacilities.length;
+    if (phEl)  phEl.innerText  = _allFacilities.filter(f => f.type === 'pharmacy').length;
+    if (hoEl)  hoEl.innerText  = _allFacilities.filter(f => f.type === 'hospital').length;
+
+    // Render Markers on Active Map (Leaflet or Google)
+    _renderMapMarkers();
+
+    // Render Healthcare Facilities List below the map
+    _renderNearbyFacilitiesList();
+
+    // Sync cart fulfilling pharmacy dropdown options with latest database stores
+    _syncCartPharmacyDropdown();
+
+  } catch (err) {
+    console.warn("Facilities fetch error, using fallback Palghar data:", err);
+    _allFacilities = _getStaticPalgharFacilities();
+    _renderMapMarkers();
+    _renderNearbyFacilitiesList();
+    _syncCartPharmacyDropdown();
+  }
+}
+
+function _getStaticPalgharFacilities() {
+  return [
+    {
+      id: "PH-001", type: "pharmacy", subtype: "Medical Store & Chemist",
+      name: "Apollo Pharmacy - Palghar Station", license: "DL-2024-AP8819",
+      address: "Station Road, Palghar West, Maharashtra - 401404", phone: "+91 98201 12345",
+      lat: 19.6975, lng: 72.7678, rating: 4.9, is_open: true, emergency_delivery: true,
+      total_stock: 140, status_badge: "140 Meds in Stock", badge_color: "green", distance_km: 0.25
+    },
+    {
+      id: "PH-002", type: "pharmacy", subtype: "Medical Store & Chemist",
+      name: "Sanjivani Medical & General Stores", license: "DL-2024-HP4412",
+      address: "Kacheri Road, Near Post Office, Palghar, Maharashtra - 401404", phone: "+91 98202 23456",
+      lat: 19.6982, lng: 72.7710, rating: 4.8, is_open: true, emergency_delivery: true,
+      total_stock: 115, status_badge: "115 Meds in Stock", badge_color: "green", distance_km: 0.32
+    },
+    {
+      id: "PH-003", type: "pharmacy", subtype: "Medical Store & Chemist",
+      name: "Mahavir Chemist & Druggist", license: "DL-2024-WM9931",
+      address: "Near ST Bus Stand, Palghar East, Maharashtra - 401404", phone: "+91 98203 34567",
+      lat: 19.6955, lng: 72.7745, rating: 4.7, is_open: true, emergency_delivery: true,
+      total_stock: 100, status_badge: "100 Meds in Stock", badge_color: "green", distance_km: 0.52
+    },
+    {
+      id: "PH-004", type: "pharmacy", subtype: "Medical Store & Chemist",
+      name: "Lifeline 24x7 Medicos", license: "DL-2024-CF1029",
+      address: "Manor Road, Opposite District Court, Palghar, Maharashtra - 401404", phone: "+91 98204 45678",
+      lat: 19.7010, lng: 72.7730, rating: 4.9, is_open: true, emergency_delivery: true,
+      total_stock: 160, status_badge: "160 Meds in Stock", badge_color: "green", distance_km: 0.65
+    },
+    {
+      id: "PH-005", type: "pharmacy", subtype: "Medical Store & Chemist",
+      name: "Wellness Pharmacy & Surgicals", license: "DL-2024-LH7741",
+      address: "Shirgaon Naka, Palghar West, Maharashtra - 401404", phone: "+91 98205 56789",
+      lat: 19.6920, lng: 72.7620, rating: 4.6, is_open: true, emergency_delivery: true,
+      total_stock: 125, status_badge: "125 Meds in Stock", badge_color: "green", distance_km: 0.85
+    },
+    {
+      id: "HOSP-001", type: "hospital", subtype: "District Civil Hospital & 24/7 Trauma",
+      name: "Palghar District Civil Hospital", license: "REG-HOSP-PALGHAR",
+      address: "Opp. Collector Office, Palghar West, Maharashtra - 401404", phone: "+91 2525 252244",
+      lat: 19.7040, lng: 72.7750, rating: 4.7, is_open: true, emergency_delivery: true,
+      icu_beds: 24, services: "24/7 Trauma, ICU, Blood Bank, Emergency OT",
+      total_stock: 220, status_badge: "ICU: 24 Beds • 220 Meds in Stock", badge_color: "blue", distance_km: 0.95
+    },
+    {
+      id: "HOSP-002", type: "hospital", subtype: "Multi-Specialty & ICU Center",
+      name: "Shraddha Hospital & Critical Care", license: "REG-HOSP-PALGHAR",
+      address: "Station Road, Palghar West, Maharashtra - 401404", phone: "+91 2525 253100",
+      lat: 19.6990, lng: 72.7660, rating: 4.8, is_open: true, emergency_delivery: true,
+      icu_beds: 16, services: "ICU, Emergency Surgery, Cardiac Care, Ventilators",
+      total_stock: 150, status_badge: "ICU: 16 Beds • 150 Meds in Stock", badge_color: "blue", distance_km: 0.45
+    },
+    {
+      id: "HOSP-003", type: "hospital", subtype: "Rural Health & Charitable Hospital",
+      name: "Dr. M. L. Dhawale Memorial Hospital", license: "REG-HOSP-PALGHAR",
+      address: "Rural Health Campus, Palghar East, Maharashtra - 401404", phone: "+91 2525 256932",
+      lat: 19.6890, lng: 72.7810, rating: 4.9, is_open: true, emergency_delivery: true,
+      icu_beds: 20, services: "Emergency Ward, Multispecialty, Diagnostic Imaging, Dialysis",
+      total_stock: 190, status_badge: "ICU: 20 Beds • 190 Meds in Stock", badge_color: "blue", distance_km: 1.2
+    },
+    {
+      id: "HOSP-004", type: "hospital", subtype: "Super Specialty & Emergency Care",
+      name: "Ved Multispeciality Hospital & Trauma", license: "REG-HOSP-PALGHAR",
+      address: "Manor Road, Palghar, Maharashtra - 401404", phone: "+91 2525 254888",
+      lat: 19.7025, lng: 72.7715, rating: 4.6, is_open: true, emergency_delivery: true,
+      icu_beds: 14, services: "24/7 Emergency, Ventilators, Ambulance Dispatch",
+      total_stock: 175, status_badge: "ICU: 14 Beds • 175 Meds in Stock", badge_color: "blue", distance_km: 0.75
+    },
+    {
+      id: "HOSP-005", type: "hospital", subtype: "Maternity & Emergency Clinic",
+      name: "Philia Hospital & Maternity Home", license: "REG-HOSP-PALGHAR",
+      address: "Kelve Road Junction, Palghar West, Maharashtra - 401404", phone: "+91 2525 251020",
+      lat: 19.6935, lng: 72.7685, rating: 4.7, is_open: true, emergency_delivery: true,
+      icu_beds: 8, services: "Emergency Care, Pediatric ICU, 24/7 In-House Pharmacy",
+      total_stock: 160, status_badge: "ICU: 8 Beds • 160 Meds in Stock", badge_color: "blue", distance_km: 0.6
+    }
   ];
+}
 
-  mockPharmacies.forEach(p => {
-    let color = '#10b981';
-    if (p.stockStatus === 'low') color = '#f59e0b';
-    if (p.stockStatus === 'out') color = '#ef4444';
+// ── Map Marker Rendering (Leaflet & Google) ─────────────────────────────────
 
-    const circleMarker = L.circleMarker([p.lat, p.lng], {
-      color: color,
-      fillColor: color,
-      fillOpacity: 0.6,
-      radius: 12
-    }).addTo(mapInstance);
+function _renderMapMarkers() {
+  if (_leafletMap) {
+    _renderLeafletMarkers();
+  } else if (_googleMap) {
+    _renderGoogleMarkers();
+  }
+}
 
-    circleMarker.bindPopup(`
-      <div style="font-family:sans-serif; padding:4px;">
-        <h4 style="margin:0 0 4px 0;">${p.name}</h4>
-        <p style="margin:0; font-size:12px; color:#64748b;">Stock Level: <strong>${p.doloStock} Units</strong></p>
-        <button onclick="addToCart('MED-001', 'Dolo 650', 'Paracetamol 650mg', 30.50, 'PH-001', '${p.name}')" style="margin-top:8px; padding:4px 8px; background:#0284c7; color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer;">+ Add to Cart</button>
+function _renderLeafletMarkers() {
+  if (!_leafletMap) return;
+
+  // Clear previous markers
+  _leafletMarkers.forEach(m => _leafletMap.removeLayer(m));
+  _leafletMarkers = [];
+  _markerMapById = {};
+
+  // Render User Location Pulsing Dot
+  if (_leafletUserMarker) {
+    _leafletMap.removeLayer(_leafletUserMarker);
+  }
+  _leafletUserMarker = L.circleMarker([_userCoords.lat, _userCoords.lng], {
+    color: '#ffffff', weight: 3,
+    fillColor: '#0284c7', fillOpacity: 1, radius: 10
+  }).addTo(_leafletMap).bindPopup(`
+    <div style="font-family:var(--font-sans); padding:4px; text-align:center;">
+      <strong style="color:#0284c7; font-size:13px;">📍 You Are Here</strong><br>
+      <span style="font-size:11px; color:#64748b;">${_userLocationName}</span>
+    </div>
+  `);
+
+  // Filter facilities by active category
+  const filtered = _allFacilities.filter(f => {
+    if (_activeCategory === 'all') return true;
+    return f.type === _activeCategory;
+  });
+
+  filtered.forEach(f => {
+    const isPharm = (f.type === 'pharmacy');
+    const color = isPharm
+      ? (f.total_stock > 30 ? '#10b981' : (f.total_stock > 0 ? '#f59e0b' : '#ef4444'))
+      : '#2563eb';
+
+    const radius = isPharm ? 12 : 14;
+
+    const marker = L.circleMarker([f.lat, f.lng], {
+      color: '#ffffff', weight: 2,
+      fillColor: color, fillOpacity: 0.92, radius: radius
+    }).addTo(_leafletMap);
+
+    const typeBadge = isPharm
+      ? `<span style="background:#ecfdf5; color:#065f46; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">🏪 Medical Store</span>`
+      : `<span style="background:#eff6ff; color:#1e40af; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">🏥 ${f.subtype || 'Hospital & ICU'}</span>`;
+
+    const cleanName = (f.name || '').replace(/'/g, "\\'");
+    const actionBtn = isPharm
+      ? `<button onclick="openFacilityMedicinesModal('${f.id}','${cleanName}','pharmacy')" style="background:#0284c7; color:#fff; border:none; padding:7px 10px; border-radius:6px; font-size:11px; cursor:pointer; width:100%; font-weight:700; margin-top:6px; display:flex; align-items:center; justify-content:center; gap:6px;"><i class="fa-solid fa-cart-shopping"></i> Order Medicines (${f.total_stock || 0} in stock)</button>`
+      : `<div style="display:flex; gap:6px; margin-top:6px;">
+           <button onclick="openFacilityMedicinesModal('${f.id}','${cleanName}','hospital')" style="background:#0284c7; color:#fff; border:none; padding:6px 8px; border-radius:6px; font-size:11px; cursor:pointer; flex:1; font-weight:700; display:flex; align-items:center; justify-content:center; gap:4px;"><i class="fa-solid fa-pills"></i> Hospital Meds (${f.total_stock || 0})</button>
+           <button onclick="openEmergencyModalForHospital('${cleanName}')" style="background:#dc2626; color:#fff; border:none; padding:6px 8px; border-radius:6px; font-size:11px; cursor:pointer; flex:1; font-weight:700; display:flex; align-items:center; justify-content:center; gap:4px;"><i class="fa-solid fa-truck-medical"></i> Emergency</button>
+         </div>`;
+
+    marker.bindPopup(`
+      <div style="font-family:sans-serif; padding:4px; min-width:215px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
+          <strong style="font-size:13px; color:#0f172a;">${f.name}</strong>
+        </div>
+        <div style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+          ${typeBadge}
+          ${f.distance_km != null ? `<span style="font-size:11px; color:#64748b; font-weight:600;">${f.distance_km} km away</span>` : ''}
+        </div>
+        <div style="font-size:11px; color:#475569; margin-bottom:4px; line-height:1.4;">
+          📍 ${f.address}<br>
+          📞 <a href="tel:${f.phone}" style="color:#0284c7; text-decoration:none;">${f.phone}</a>
+        </div>
+        <div style="font-size:11px; font-weight:700; color:${color}; margin-bottom:4px;">
+          ${f.status_badge || 'Active'}
+        </div>
+        ${actionBtn}
       </div>
     `);
+
+    _leafletMarkers.push(marker);
+    _markerMapById[f.id] = marker;
   });
+}
+
+function _renderGoogleMarkers() {
+  if (!_googleMap) return;
+
+  _googleMarkers.forEach(m => m.setMap(null));
+  _googleMarkers = [];
+  _markerMapById = {};
+
+  // User Marker
+  if (_googleUserMarker) _googleUserMarker.setMap(null);
+  _googleUserMarker = new google.maps.Marker({
+    position: _userCoords,
+    map: _googleMap,
+    title: 'Your Location',
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#0284c7', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+  });
+
+  const iw = new google.maps.InfoWindow();
+  const filtered = _allFacilities.filter(f => (_activeCategory === 'all' || f.type === _activeCategory));
+
+  filtered.forEach(f => {
+    const isPharm = (f.type === 'pharmacy');
+    const color = isPharm ? (f.total_stock > 30 ? '#10b981' : '#f59e0b') : '#2563eb';
+    const m = new google.maps.Marker({
+      position: { lat: f.lat, lng: f.lng },
+      map: _googleMap,
+      title: f.name,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: isPharm ? 11 : 13, fillColor: color, fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 2 }
+    });
+
+    m.addListener('click', () => {
+      const cleanName = (f.name || '').replace(/'/g, "\\'");
+      const actionHtml = isPharm
+        ? `<button onclick="openFacilityMedicinesModal('${f.id}','${cleanName}','pharmacy')" style="background:#0284c7; color:#fff; border:none; padding:6px 10px; border-radius:6px; font-size:11px; cursor:pointer; width:100%; font-weight:700; margin-top:6px;">🛒 Order Medicines (${f.total_stock || 0} in stock)</button>`
+        : `<div style="display:flex; gap:6px; margin-top:6px;">
+             <button onclick="openFacilityMedicinesModal('${f.id}','${cleanName}','hospital')" style="background:#0284c7; color:#fff; border:none; padding:6px 8px; border-radius:6px; font-size:11px; cursor:pointer; flex:1; font-weight:700;">💊 Hospital Meds (${f.total_stock || 0})</button>
+             <button onclick="openEmergencyModalForHospital('${cleanName}')" style="background:#dc2626; color:#fff; border:none; padding:6px 8px; border-radius:6px; font-size:11px; cursor:pointer; flex:1; font-weight:700;">🚨 Emergency</button>
+           </div>`;
+
+      iw.setContent(`
+        <div style="font-family:sans-serif; padding:4px; min-width:215px;">
+          <strong style="font-size:13px; color:#0f172a;">${f.name}</strong><br>
+          <span style="font-size:11px; color:#64748b;">${isPharm ? '🏪 Medical Store' : '🏥 Hospital'} &bull; ${f.distance_km != null ? f.distance_km + ' km' : ''}</span><br>
+          <div style="font-size:11px; color:#475569; margin:3px 0;">📍 ${f.address}</div>
+          <span style="color:${color}; font-weight:700; font-size:12px;">${f.status_badge}</span>
+          ${actionHtml}
+        </div>
+      `);
+      iw.open(_googleMap, m);
+    });
+
+    _googleMarkers.push(m);
+    _markerMapById[f.id] = m;
+  });
+}
+
+// ── Render Healthcare Facilities Cards Below the Map ────────────────────────
+
+function _renderNearbyFacilitiesList() {
+  const container = document.getElementById('nearbyFacilitiesContainer');
+  if (!container) return;
+
+  let list = _allFacilities.filter(f => {
+    if (_activeCategory !== 'all' && f.type !== _activeCategory) return false;
+    if (_facilitySearchTerm) {
+      const q = _facilitySearchTerm.toLowerCase();
+      return (f.name.toLowerCase().includes(q) || f.address.toLowerCase().includes(q));
+    }
+    return true;
+  });
+
+  // Sort
+  if (_facilitySortTerm === 'distance') {
+    list.sort((a, b) => (a.distance_km != null ? a.distance_km : 999) - (b.distance_km != null ? b.distance_km : 999));
+  } else if (_facilitySortTerm === 'rating') {
+    list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  } else if (_facilitySortTerm === 'name') {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 30px; background: var(--bg-subtle); border-radius: 8px;">
+        <i class="fa-solid fa-store-slash" style="font-size: 28px; color: var(--text-muted); margin-bottom: 8px;"></i>
+        <div style="font-weight: 700;">No healthcare facilities found matching your filter.</div>
+        <p style="font-size: 12px; color: var(--text-muted);">Try selecting "All" or clearing the search box.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  list.forEach(f => {
+    const isPharm = (f.type === 'pharmacy');
+    const badgeBg = isPharm ? 'rgba(16, 185, 129, 0.12)' : 'rgba(37, 99, 235, 0.12)';
+    const badgeColor = isPharm ? '#059669' : '#1d4ed8';
+    const typeLabel = isPharm ? '🏪 Medical Store & Chemist' : `🏥 ${f.subtype || 'Hospital & ICU'}`;
+
+    const statusPill = isPharm
+      ? `<span class="badge badge-green" style="font-size:11px;"><i class="fa-solid fa-boxes-stacked"></i> ${f.status_badge || 'Meds Available'}</span>`
+      : `<span class="badge badge-blue" style="font-size:11px;"><i class="fa-solid fa-bed-pulse"></i> ${f.status_badge || 'ICU Beds Ready'}</span>`;
+
+    const emergencyBadge = f.emergency_delivery
+      ? `<span style="font-size:11px; color:var(--emerald-green); font-weight:700;"><i class="fa-solid fa-truck-fast"></i> Express 15-min delivery</span>`
+      : `<span style="font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-clock"></i> Open Regular Hours</span>`;
+
+    const cleanName = (f.name || '').replace(/'/g, "\\'");
+    const primaryAction = isPharm
+      ? `<button class="btn btn-primary" onclick="openFacilityMedicinesModal('${f.id}', '${cleanName}', 'pharmacy')" style="padding: 6px 12px; font-size: 12px; flex: 1;">
+           <i class="fa-solid fa-cart-shopping"></i> Order Meds (${f.total_stock || 0})
+         </button>`
+      : `<div style="display:flex; gap:6px; flex:1;">
+           <button class="btn btn-primary" onclick="openFacilityMedicinesModal('${f.id}', '${cleanName}', 'hospital')" style="padding: 6px 10px; font-size: 12px; flex: 1; background: var(--medical-blue); border-color: var(--medical-blue);">
+             <i class="fa-solid fa-pills"></i> Hospital Meds (${f.total_stock || 0})
+           </button>
+           <button class="btn btn-primary" onclick="openEmergencyModalForHospital('${cleanName}')" style="padding: 6px 10px; font-size: 12px; background:var(--rose-danger); border-color:var(--rose-danger); flex: 1;">
+             <i class="fa-solid fa-truck-medical"></i> Emergency
+           </button>
+         </div>`;
+
+    html += `
+      <div class="facility-card" id="card-facility-${f.id}" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm); transition: transform 0.2s, box-shadow 0.2s;">
+        <div>
+          <!-- Header: Category Badge + Distance -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="background: ${badgeBg}; color: ${badgeColor}; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+              ${typeLabel}
+            </span>
+            <span style="font-size: 12px; font-weight: 800; color: var(--medical-blue); background: var(--bg-subtle); padding: 2px 8px; border-radius: 12px;">
+              📍 ${f.distance_km != null ? f.distance_km + ' km' : 'Nearby'}
+            </span>
+          </div>
+
+          <!-- Facility Name & Rating -->
+          <h4 style="font-size: 15px; font-weight: 800; color: var(--text-primary); margin: 0 0 6px 0; line-height: 1.3;">
+            ${f.name}
+          </h4>
+
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px;">
+            <span style="color: #f59e0b; font-weight: 700;"><i class="fa-solid fa-star"></i> ${f.rating || '4.8'}</span>
+            <span style="color: var(--text-muted);">&bull;</span>
+            ${statusPill}
+          </div>
+
+          <!-- Address & Phone -->
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5;">
+            <div><i class="fa-solid fa-location-dot" style="color:var(--text-muted); width:14px;"></i> ${f.address}</div>
+            <div style="margin-top: 3px;"><i class="fa-solid fa-phone" style="color:var(--text-muted); width:14px;"></i> <a href="tel:${f.phone}" style="color:var(--medical-blue); font-weight:600; text-decoration:none;">${f.phone}</a></div>
+          </div>
+
+          <!-- Services / Features tag -->
+          <div style="margin-bottom: 14px;">
+            ${emergencyBadge}
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
+          <button class="btn btn-secondary" onclick="focusFacilityOnMap('${f.id}')" style="padding: 6px 10px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+            <i class="fa-solid fa-map-pin" style="color:var(--emerald-green);"></i> View on Map
+          </button>
+          ${primaryAction}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// ── Interactive Map Helpers ─────────────────────────────────────────────────
+
+function filterFacilities(cat) {
+  _activeCategory = cat;
+  ['filterAllBtn', 'filterPharmBtn', 'filterHospBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active-filter');
+  });
+
+  if (cat === 'all') {
+    const el = document.getElementById('filterAllBtn');
+    if (el) el.classList.add('active-filter');
+  } else if (cat === 'pharmacy') {
+    const el = document.getElementById('filterPharmBtn');
+    if (el) el.classList.add('active-filter');
+  } else if (cat === 'hospital') {
+    const el = document.getElementById('filterHospBtn');
+    if (el) el.classList.add('active-filter');
+  }
+
+  _renderMapMarkers();
+  _renderNearbyFacilitiesList();
+}
+
+function handleFacilitySearch(val) {
+  _facilitySearchTerm = val.trim();
+  _renderNearbyFacilitiesList();
+}
+
+function handleFacilitySort(val) {
+  _facilitySortTerm = val;
+  _renderNearbyFacilitiesList();
+}
+
+function focusFacilityOnMap(facilityId) {
+  const fac = _allFacilities.find(f => f.id === facilityId);
+  if (!fac) return;
+
+  // Scroll to map container
+  const mapSection = document.getElementById('healthcareMapSection');
+  if (mapSection) {
+    mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  if (_leafletMap) {
+    _leafletMap.setView([fac.lat, fac.lng], 16, { animate: true });
+    const marker = _markerMapById[facilityId];
+    if (marker) {
+      setTimeout(() => { marker.openPopup(); }, 300);
+    }
+  } else if (_googleMap) {
+    _googleMap.setCenter({ lat: fac.lat, lng: fac.lng });
+    _googleMap.setZoom(16);
+    const marker = _markerMapById[facilityId];
+    if (marker) {
+      google.maps.event.trigger(marker, 'click');
+    }
+  }
+}
+
+function selectStoreForOrder(pharmacyId, pharmacyName) {
+  const fac = _allFacilities.find(f => f.id === pharmacyId);
+  const type = fac ? fac.type : 'pharmacy';
+  openFacilityMedicinesModal(pharmacyId, pharmacyName, type);
+}
+
+function openEmergencyModalForHospital(hospitalName) {
+  openEmergencyModal();
+  const medInput = document.getElementById('emgMedicine');
+  if (medInput && !medInput.value) {
+    medInput.value = `Emergency Bed / ICU Admission at ${hospitalName}`;
+  }
+}
+
+// ==========================================
+// DEDICATED FACILITY MEDICINE CATALOG ENGINE
+// ==========================================
+
+let _currentFacilityData = null;
+let _activeFacCategory = 'all';
+
+async function openFacilityMedicinesModal(facilityId, facilityName, facilityType) {
+  const modal = document.getElementById('facilityMedicinesModal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('facMedFacilityName');
+  const typeBadge = document.getElementById('facMedTypeBadge');
+  const addressEl = document.getElementById('facMedAddress');
+  const phoneEl = document.getElementById('facMedPhone');
+  const stockBadge = document.getElementById('facMedStockBadge');
+  const iconContainer = document.getElementById('facMedIconContainer');
+  const container = document.getElementById('facilityMedicinesContainer');
+  const searchInput = document.getElementById('facilityMedSearchInput');
+
+  if (titleEl) titleEl.innerText = facilityName;
+  if (searchInput) searchInput.value = '';
+  _activeFacCategory = 'all';
+
+  const isHosp = (facilityType === 'hospital');
+  if (iconContainer) {
+    iconContainer.innerHTML = isHosp ? '<i class="fa-solid fa-hospital"></i>' : '<i class="fa-solid fa-clinic-medical"></i>';
+    iconContainer.style.background = isHosp ? 'rgba(37, 99, 235, 0.12)' : 'rgba(16, 185, 129, 0.12)';
+    iconContainer.style.color = isHosp ? '#2563eb' : '#059669';
+  }
+  if (typeBadge) {
+    typeBadge.className = isHosp ? 'badge badge-blue' : 'badge badge-green';
+    typeBadge.innerText = isHosp ? '🏥 Hospital & In-House Pharmacy' : '🏪 Medical Store & Chemist';
+  }
+
+  container.innerHTML = `
+    <div style="text-align:center; padding:50px 20px; color:var(--text-muted);">
+      <i class="fa-solid fa-circle-notch fa-spin" style="font-size:32px; color:var(--medical-blue);"></i>
+      <p style="margin-top:12px; font-weight:600;">Loading real-time medicine dataset for ${facilityName}...</p>
+    </div>
+  `;
+
+  modal.classList.add('active');
+  updateFacilityCartSummary(facilityId, facilityName);
+
+  try {
+    const res = await fetch(`/api/facilities/${facilityId}/medicines`);
+    if (!res.ok) {
+      container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--rose-danger);"><i class="fa-solid fa-triangle-exclamation" style="font-size:24px;"></i><p style="margin-top:8px;">Failed to load medicines dataset for this facility.</p></div>`;
+      return;
+    }
+    const data = await res.json();
+    _currentFacilityData = data;
+
+    const fac = data.facility;
+    if (addressEl) addressEl.innerHTML = `<i class="fa-solid fa-location-dot" style="color:var(--medical-blue);"></i> ${fac.address}`;
+    if (phoneEl) phoneEl.innerHTML = `<i class="fa-solid fa-phone" style="color:var(--medical-blue);"></i> <a href="tel:${fac.phone}" style="color:inherit; text-decoration:none;">${fac.phone}</a>`;
+    if (stockBadge) stockBadge.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> ${data.total_medicines} Medicines in Stock`;
+
+    renderFacilityCategoryChips(data.categories || []);
+    renderFacilityMedicinesList(data.medicines || []);
+  } catch (err) {
+    console.error("Error loading facility medicines:", err);
+    container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--rose-danger);">Failed to connect to facility medicine server.</div>`;
+  }
+}
+
+function closeFacilityMedicinesModal() {
+  const modal = document.getElementById('facilityMedicinesModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function renderFacilityCategoryChips(categories) {
+  const container = document.getElementById('facMedCategoryChips');
+  if (!container) return;
+
+  let html = `<button onclick="filterFacilityByCategory('all')" class="badge ${_activeFacCategory === 'all' ? 'badge-blue' : 'badge-subtle'}" style="cursor:pointer; border:none; padding:5px 12px; font-size:12px; font-weight:700; white-space:nowrap; border-radius:20px;">All Meds</button>`;
+  categories.forEach(cat => {
+    const active = (_activeFacCategory === cat) ? 'badge-blue' : 'badge-subtle';
+    html += `<button onclick="filterFacilityByCategory('${cat.replace(/'/g, "\\'")}')" class="badge ${active}" style="cursor:pointer; border:none; padding:5px 12px; font-size:12px; font-weight:700; white-space:nowrap; border-radius:20px;">${cat}</button>`;
+  });
+  container.innerHTML = html;
+}
+
+function filterFacilityByCategory(category) {
+  _activeFacCategory = category;
+  if (_currentFacilityData) {
+    renderFacilityCategoryChips(_currentFacilityData.categories || []);
+    filterFacilityMedicines();
+  }
+}
+
+function filterFacilityMedicines() {
+  if (!_currentFacilityData || !_currentFacilityData.medicines) return;
+  const q = (document.getElementById('facilityMedSearchInput')?.value || '').toLowerCase().trim();
+
+  const filtered = _currentFacilityData.medicines.filter(m => {
+    const matchesCat = (_activeFacCategory === 'all' || m.category === _activeFacCategory);
+    if (!matchesCat) return false;
+    if (!q) return true;
+    return m.name.toLowerCase().includes(q) ||
+           m.generic_name.toLowerCase().includes(q) ||
+           m.category.toLowerCase().includes(q) ||
+           (m.symptoms && m.symptoms.some(s => s.toLowerCase().includes(q)));
+  });
+
+  renderFacilityMedicinesList(filtered);
+}
+
+function renderFacilityMedicinesList(medicines) {
+  const container = document.getElementById('facilityMedicinesContainer');
+  if (!container) return;
+
+  if (medicines.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:40px 20px; color:var(--text-muted); background:var(--bg-card); border-radius:10px; border:1px dashed var(--border-color);">
+        <i class="fa-solid fa-pills" style="font-size:32px; color:var(--text-muted); margin-bottom:10px;"></i>
+        <h4 style="margin:0 0 6px 0; color:var(--text-primary);">No medicines found</h4>
+        <p style="font-size:13px; margin:0;">No medicines matching your search or category filter in this facility's dataset.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const fac = _currentFacilityData.facility;
+  const facId = fac.id;
+  const facName = fac.name.replace(/'/g, "\\'");
+
+  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px;">`;
+
+  medicines.forEach(m => {
+    const isRx = m.prescription_required;
+    const isLowStock = m.stock < 20;
+    const stockBadge = isLowStock
+      ? `<span style="font-size:11px; font-weight:700; color:#b45309; background:#fef3c7; padding:2px 8px; border-radius:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Only ${m.stock} left</span>`
+      : `<span style="font-size:11px; font-weight:700; color:#065f46; background:#ecfdf5; padding:2px 8px; border-radius:6px;"><i class="fa-solid fa-circle-check"></i> ${m.stock} in Stock</span>`;
+
+    const cleanMedName = m.name.replace(/'/g, "\\'");
+    const cleanGenName = (m.generic_name || '').replace(/'/g, "\\'");
+
+    html += `
+      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:10px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:var(--shadow-sm); transition:transform 0.15s, box-shadow 0.15s;">
+        <div>
+          <!-- Category & Rx Badge -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:10px; font-weight:700; background:rgba(2, 132, 199, 0.08); color:var(--medical-blue); padding:2px 6px; border-radius:4px;">
+              ${m.category}
+            </span>
+            <span style="font-size:10px; font-weight:700; color:${isRx ? '#b45309' : '#059669'}; background:${isRx ? '#fffbeb' : '#f0fdf4'}; padding:2px 6px; border-radius:4px;">
+              ${isRx ? 'Rx Required' : 'OTC'}
+            </span>
+          </div>
+
+          <!-- Medicine Name & Formula -->
+          <h4 style="font-size:15px; font-weight:800; color:var(--text-primary); margin:0 0 3px 0; line-height:1.3;">
+            ${m.name}
+          </h4>
+          <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px; line-height:1.3;">
+            ${m.generic_name}
+          </div>
+
+          <!-- Dosage & Symptoms -->
+          <div style="font-size:11px; color:var(--text-secondary); background:var(--bg-subtle); padding:6px 8px; border-radius:6px; margin-bottom:8px;">
+            <div><strong>Dosage:</strong> ${m.dosage || 'As directed by physician'}</div>
+            ${m.symptoms && m.symptoms.length > 0 ? `<div style="margin-top:2px;"><strong>For:</strong> ${m.symptoms.slice(0, 3).join(', ')}</div>` : ''}
+          </div>
+
+          <!-- Stock Pill -->
+          <div style="margin-bottom:10px;">
+            ${stockBadge}
+          </div>
+        </div>
+
+        <!-- Price & Action Buttons -->
+        <div style="border-top:1px solid var(--border-color); padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span style="font-size:11px; color:var(--text-muted);">MRP / Unit:</span>
+            <span style="font-size:16px; font-weight:800; color:var(--emerald-green);">₹ ${m.price.toFixed(2)}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-secondary" onclick="addFacilityMedicineToCart('${m.id}', '${cleanMedName}', '${cleanGenName}', ${m.price}, '${facId}', '${facName}')" style="padding:6px 10px; font-size:11px; flex:1; display:flex; align-items:center; justify-content:center; gap:4px;">
+              <i class="fa-solid fa-plus"></i> Add to Cart
+            </button>
+            <button class="btn btn-primary" onclick="orderNowDirect('${m.id}', '${cleanMedName}', '${cleanGenName}', ${m.price}, '${facId}', '${facName}')" style="padding:6px 10px; font-size:11px; flex:1; display:flex; align-items:center; justify-content:center; gap:4px; font-weight:700;">
+              <i class="fa-solid fa-bolt"></i> Order Now
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function addFacilityMedicineToCart(medId, medName, genericName, price, facilityId, facilityName) {
+  addToCart(medId, medName, genericName, price, facilityId, facilityName);
+  updateFacilityCartSummary(facilityId, facilityName);
+}
+
+function orderNowDirect(medId, medName, genericName, price, facilityId, facilityName) {
+  if (!currentUser) {
+    alert("🔒 Authentication Required: Please sign in or create a Patient account to order medicines.");
+    openAuthModal('patient');
+    return;
+  }
+  if (currentUser.role !== 'patient' && currentUser.role !== 'admin') {
+    alert("⚠️ Patient Access Only: Only Patient accounts can place orders.");
+    return;
+  }
+
+  const existing = cart.find(c => c.med_id === medId && c.pharmacy_id === facilityId);
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    cart.push({
+      med_id: medId,
+      name: medName,
+      generic_name: genericName,
+      price: price,
+      quantity: 1,
+      pharmacy_id: facilityId,
+      pharmacy_name: facilityName
+    });
+  }
+
+  localStorage.setItem('pharma_cart', JSON.stringify(cart));
+  updateCartBadge();
+  closeFacilityMedicinesModal();
+
+  openCartModalForFacility(facilityId, facilityName);
+}
+
+function updateFacilityCartSummary(facilityId, facilityName) {
+  const summaryEl = document.getElementById('facMedCartSummary');
+  const totalEl = document.getElementById('facMedCartTotal');
+  if (!summaryEl || !totalEl) return;
+
+  const targetId = facilityId || (_currentFacilityData && _currentFacilityData.facility ? _currentFacilityData.facility.id : null);
+  const items = targetId ? cart.filter(c => c.pharmacy_id === targetId) : cart;
+
+  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+  const grandTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  summaryEl.innerText = `🛒 Cart: ${totalQty} items for this facility`;
+  totalEl.innerText = `₹ ${grandTotal.toFixed(2)}`;
+}
+
+function proceedToCheckoutFromFacility() {
+  if (!_currentFacilityData || !_currentFacilityData.facility) {
+    openCartModal();
+    return;
+  }
+  const fac = _currentFacilityData.facility;
+  const itemsForFacility = cart.filter(c => c.pharmacy_id === fac.id);
+  if (itemsForFacility.length === 0) {
+    alert(`Please add at least 1 medicine from "${fac.name}" to cart first, or click "Order Now" on any medicine.`);
+    return;
+  }
+  closeFacilityMedicinesModal();
+  openCartModalForFacility(fac.id, fac.name);
+}
+
+function openCartModalForFacility(facilityId, facilityName) {
+  openCartModal();
+  const sel = document.getElementById('cartPharmacySelect');
+  if (sel) {
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === facilityId) {
+        sel.selectedIndex = i;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      const opt = document.createElement('option');
+      opt.value = facilityId;
+      opt.innerText = facilityName;
+      sel.appendChild(opt);
+      sel.value = facilityId;
+    }
+    onCartPharmacySelectChanged();
+  }
+}
+
+function _syncCartPharmacyDropdown() {
+  const sel = document.getElementById('cartPharmacySelect');
+  if (sel && _allFacilities && _allFacilities.length > 0) {
+    const currentVal = sel.value;
+    let html = '';
+    _allFacilities.forEach(f => {
+      const isHosp = (f.type === 'hospital');
+      const icon = isHosp ? '🏥' : '🏪';
+      const dist = (f.distance_km != null) ? ` (${f.distance_km} km)` : '';
+      html += `<option value="${f.id}" data-name="${f.name.replace(/"/g, '&quot;')}" data-address="${(f.address || '').replace(/"/g, '&quot;')}" data-phone="${(f.phone || '').replace(/"/g, '&quot;')}">${icon} ${f.name}${dist}</option>`;
+    });
+    sel.innerHTML = html;
+    if (currentVal) {
+      sel.value = currentVal;
+    } else if (cart.length > 0) {
+      sel.value = cart[0].pharmacy_id;
+    }
+    onCartPharmacySelectChanged();
+  }
+
+  const emgSel = document.getElementById('emgPharmacy');
+  if (emgSel && _allFacilities && _allFacilities.length > 0) {
+    let emgHtml = '';
+    _allFacilities.forEach(f => {
+      const isHosp = (f.type === 'hospital');
+      const icon = isHosp ? '🏥' : '🏪';
+      const dist = (f.distance_km != null) ? ` (${f.distance_km} km)` : '';
+      emgHtml += `<option value="${f.id}">${icon} ${f.name}${dist} — 24/7 Service</option>`;
+    });
+    emgSel.innerHTML = emgHtml;
+  }
+}
+
+function onCartPharmacySelectChanged() {
+  const sel = document.getElementById('cartPharmacySelect');
+  const bannerName = document.getElementById('cartFulfillingStoreName');
+  const bannerDetails = document.getElementById('cartFulfillingStoreDetails');
+  if (!sel) return;
+
+  const opt = sel.selectedOptions[0];
+  if (!opt) return;
+
+  const facId = opt.value;
+  const fac = _allFacilities.find(f => f.id === facId);
+  const name = fac ? fac.name : (opt.getAttribute('data-name') || opt.text);
+  const address = fac ? fac.address : (opt.getAttribute('data-address') || 'Station Road, Palghar');
+  const phone = fac ? fac.phone : (opt.getAttribute('data-phone') || '+91 98200 00000');
+  const isHosp = fac ? (fac.type === 'hospital') : name.includes('Hospital');
+
+  if (bannerName) {
+    bannerName.innerHTML = `${isHosp ? '🏥' : '🏪'} ${name}`;
+  }
+  if (bannerDetails) {
+    bannerDetails.innerHTML = `${address} • 📞 ${phone}`;
+  }
+}
+
+// ── Google Maps optional callback ───────────────────────────────────────────
+function initGoogleMap() {
+  const container = document.getElementById('googleMapContainer');
+  if (!container) return;
+
+  if (_leafletMap) { _leafletMap.remove(); _leafletMap = null; }
+
+  _googleMap = new google.maps.Map(container, {
+    zoom: 14,
+    center: _userCoords,
+    mapTypeId: 'roadmap',
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true
+  });
+
+  _loadFacilitiesData();
+}
+
+
+
+// ==========================================
+// EMERGENCY DISPATCH MODAL
+// ==========================================
+
+function openEmergencyModal() {
+  const modal = document.getElementById('emergencyModal');
+  if (!modal) return;
+
+  // Pre-fill patient info if logged in
+  if (currentUser) {
+    const nameEl  = document.getElementById('emgPatientName');
+    const phoneEl = document.getElementById('emgPhone');
+    if (nameEl  && currentUser.name)  nameEl.value  = currentUser.name;
+    if (phoneEl && currentUser.phone) phoneEl.value = currentUser.phone;
+  }
+
+  // Auto-detect location
+  detectEmergencyLocation();
+
+  // Reset result area
+  const result = document.getElementById('emergencyResult');
+  if (result) result.style.display = 'none';
+  const form = document.getElementById('emergencyForm');
+  if (form) form.style.display = 'block';
+
+  modal.classList.add('active');
+}
+
+function closeEmergencyModal() {
+  const modal = document.getElementById('emergencyModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function detectEmergencyLocation() {
+  const addrInput = document.getElementById('emgAddress');
+  if (!addrInput) return;
+  if (navigator.geolocation) {
+    addrInput.value = 'Detecting your location...';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        // Reverse geocode using Nominatim (free, no key needed)
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+          .then(r => r.json())
+          .then(d => {
+            addrInput.value = d.display_name || `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+          })
+          .catch(() => {
+            addrInput.value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+          });
+      },
+      () => { addrInput.placeholder = 'Enter your address manually'; addrInput.value = ''; }
+    );
+  }
+}
+
+async function handleEmergencySubmit(e) {
+  e.preventDefault();
+
+  const name    = document.getElementById('emgPatientName').value.trim();
+  const phone   = document.getElementById('emgPhone').value.trim();
+  const med     = document.getElementById('emgMedicine').value.trim();
+  const address = document.getElementById('emgAddress').value.trim();
+  const pharmId = document.getElementById('emgPharmacy').value;
+
+  const submitBtn = document.getElementById('emgSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Dispatching...';
+
+  try {
+    const res  = await fetch('/api/emergency/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient_name:     name,
+        patient_phone:    phone,
+        location_address: address,
+        requested_med:    med,
+        pharmacy_id:      pharmId
+      })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.status === 'DISPATCHED') {
+      const result = document.getElementById('emergencyResult');
+      result.style.display = 'block';
+      result.innerHTML = `
+        <div style="background:rgba(16,185,129,0.08);border:1.5px solid #10b981;border-radius:12px;padding:18px;">
+          <div style="font-size:22px;margin-bottom:8px;">🚨 Dispatch Confirmed!</div>
+          <div style="font-size:14px;font-weight:700;color:#10b981;margin-bottom:12px;">${data.message}</div>
+          <div style="font-size:13px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>🏪 <strong>Pharmacy:</strong><br>${data.pharmacy_name}</div>
+            <div>⏱️ <strong>ETA:</strong><br><span style="color:var(--rose-danger);font-weight:800;">${data.eta}</span></div>
+            <div>🛵 <strong>Rider:</strong><br>${data.rider_name}</div>
+            <div>📞 <strong>Rider Phone:</strong><br><a href="tel:${data.rider_phone}" style="color:var(--medical-blue);">${data.rider_phone}</a></div>
+          </div>
+        </div>
+      `;
+      // Hide the form, keep modal open to show result
+      document.getElementById('emergencyForm').style.display = 'none';
+      showToast('🚨 Emergency Dispatched!', `Rider ${data.rider_name} is on the way. ETA: ${data.eta}`, 'success');
+    } else {
+      alert(`Emergency dispatch failed: ${data.detail || 'Unknown error'}`);
+    }
+  } catch (err) {
+    alert('Network error. Please call emergency helpline: 1800-PHARMA-AI');
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-truck-medical"></i> 🚨 DISPATCH EMERGENCY RIDER NOW';
+  }
 }
 
 // ==========================================
@@ -1166,7 +2267,7 @@ async function uploadPrescriptionFile(e) {
             </div>
           </div>
           <div>
-            <button class="btn btn-primary" style="padding:6px 12px; font-size:12px;" onclick="addToCart('${item.medicine.id}', '${item.corrected_name}', '${item.medicine.generic_name}', ${item.medicine.mrp}, 'PH-001', 'Apollo Pharmacy - Downtown')">
+            <button class="btn btn-primary" style="padding:6px 12px; font-size:12px;" onclick="addToCart('${item.medicine.id}', '${item.corrected_name}', '${item.medicine.generic_name}', ${item.medicine.mrp}, '${_allFacilities[0]?.id || 'PH-001'}', '${(_allFacilities[0]?.name || 'Apollo Pharmacy - Palghar Station').replace(/'/g, "\\'")}')">
               <i class="fa-solid fa-cart-plus"></i> Add
             </button>
           </div>
@@ -1221,7 +2322,7 @@ function addToCart(medId, medName, genericName, price, pharmacyId, pharmacyName)
 
   localStorage.setItem('pharma_cart', JSON.stringify(cart));
   updateCartBadge();
-  alert(`🛒 Added 1x "${medName}" to Cart!`);
+  alert(`🛒 Added 1x "${medName}" to Cart from ${pharmacyName}!`);
 }
 
 function updateCartBadge() {
@@ -1241,6 +2342,15 @@ function openCartModal() {
   }
   const modal = document.getElementById('cartModal');
   if (!modal) return;
+
+  _syncCartPharmacyDropdown();
+  if (cart.length > 0) {
+    const sel = document.getElementById('cartPharmacySelect');
+    if (sel) {
+      sel.value = cart[0].pharmacy_id;
+      onCartPharmacySelectChanged();
+    }
+  }
 
   renderCartItems();
   modal.classList.add('active');
@@ -1315,9 +2425,10 @@ async function handleCartCheckout(e) {
   const patientName = currentUser.name;
   const patientPhone = currentUser.phone || "+91 98201 99887";
   const address = document.getElementById('cartAddress').value || currentUser.address || "Flat 402, Sunshine Heights";
-  const pharmacyId = document.getElementById('cartPharmacySelect').value || cart[0].pharmacy_id;
+  const pharmacyId = document.getElementById('cartPharmacySelect').value || (cart[0] && cart[0].pharmacy_id) || "PH-001";
+  const selOpt = document.getElementById('cartPharmacySelect')?.selectedOptions[0];
+  const pharmacyName = (cart[0] && cart[0].pharmacy_name) || (selOpt ? (selOpt.getAttribute('data-name') || selOpt.text) : "Selected Medical Store");
   const deliveryType = document.getElementById('cartDeliveryType').value || "DELIVERY";
-
 
   const cartItemsPayload = cart.map(item => ({
     med_id: item.med_id,
@@ -1334,6 +2445,7 @@ async function handleCartCheckout(e) {
         patient_phone: patientPhone,
         patient_address: address,
         pharmacy_id: pharmacyId,
+        pharmacy_name: pharmacyName,
         delivery_type: deliveryType,
         items: cartItemsPayload
       })
@@ -1436,7 +2548,7 @@ function renderPatientOrders(orders) {
         </div>
 
         <div style="font-size:13px; color:var(--text-secondary);">
-          <strong>Ordered Items:</strong> ${order.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}
+          <strong>Ordered Items:</strong> ${(order.items || []).map(i => `${i.med_name || i.name || 'Medicine'} (x${i.quantity || 1})`).join(', ')}
         </div>
 
         <div style="margin-top:10px; text-align:right;">
@@ -1474,7 +2586,7 @@ function showOrderReceiptModal(order) {
   const content = document.getElementById('receiptContent');
   if (!modal || !content) return;
 
-  let itemsHtml = order.items.map(i => `<li>${i.name} x ${i.quantity} = ₹${i.total_price.toFixed(2)}</li>`).join('');
+  let itemsHtml = (order.items || []).map(i => `<li>${i.med_name || i.name || 'Medicine'} x ${i.quantity || 1} = ₹${((i.total_price != null ? i.total_price : (i.unit_price || 0) * (i.quantity || 1))).toFixed(2)}</li>`).join('');
 
   content.innerHTML = `
     <div style="text-align:center; margin-bottom:12px;">
@@ -1577,7 +2689,7 @@ function renderPharmacyOrders() {
         </div>
 
         <div style="font-size:13px; background:var(--bg-subtle); padding:8px 12px; border-radius:6px; margin-bottom:12px;">
-          <strong>Items:</strong> ${order.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}
+          <strong>Items:</strong> ${(order.items || []).map(i => `${i.med_name || i.name || 'Medicine'} (x${i.quantity || 1})`).join(', ')}
         </div>
 
         <!-- Dynamic Action Buttons -->
@@ -1676,8 +2788,11 @@ function renderInventoryTable(items) {
     return;
   }
 
+  window._storeInventoryMap = window._storeInventoryMap || {};
+
   let html = '';
   items.forEach(item => {
+    window._storeInventoryMap[item.med_id] = item;
     let alertBadge = '<span class="badge badge-green">NORMAL</span>';
     if (item.expiry_alert === 'CRITICAL_30_DAYS') alertBadge = '<span class="badge badge-danger">🚨 Expiry <30 Days</span>';
     if (item.expiry_alert === 'WARNING_60_DAYS') alertBadge = '<span class="badge badge-warning">⚠️ Expiry <60 Days</span>';
@@ -1687,16 +2802,18 @@ function renderInventoryTable(items) {
       <tr>
         <td><strong>${item.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${item.generic_name}</span></td>
         <td>${item.category}</td>
-        <td><strong style="color:${item.low_stock_flag ? 'var(--rose-danger)' : 'var(--text-primary)'};">${item.stock} Units</strong></td>
-        <td>
-          <strong style="color:var(--emerald-green);">₹ ${item.mrp.toFixed(2)}</strong>
-          <button class="btn btn-secondary" style="padding:2px 6px; font-size:11px; margin-left:6px;" onclick="promptUpdateMedicinePrice('${item.med_id}', '${item.name}', ${item.mrp})" title="Modify selling price for patient search">✏️ Edit Price</button>
+        <td id="invStock_${item.med_id}"><strong style="color:${item.low_stock_flag ? 'var(--rose-danger)' : 'var(--text-primary)'};">${item.stock} Units</strong></td>
+        <td id="invPrice_${item.med_id}">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <strong style="color:var(--emerald-green); font-size:13px;" id="invPriceText_${item.med_id}">₹ ${Number(item.mrp || 0).toFixed(2)}</strong>
+            <button class="btn btn-secondary" style="padding:3px 8px; font-size:11px; margin-left:4px; cursor:pointer;" onclick="openEditPriceModal('${item.med_id}')" title="Modify selling price for patient search">✏️ Edit Price</button>
+          </div>
         </td>
         <td><code>${item.batch}</code></td>
         <td>${item.expiry}</td>
         <td>${alertBadge}</td>
         <td>
-          <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="quickStockRefill('${item.med_id}', '${item.name}')">+ Refill Stock</button>
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; cursor:pointer;" onclick="openQuickRefillModal('${item.med_id}')">+ Refill Stock</button>
         </td>
       </tr>
     `;
@@ -1759,30 +2876,7 @@ async function handleAddStockSubmit(e) {
 }
 
 async function quickStockRefill(medId, medName) {
-  const qtyStr = prompt(`Refill Stock for '${medName}'. Enter quantity to add:`, "50");
-  if (!qtyStr) return;
-  const qty = parseInt(qtyStr);
-
-  const storeId = getStoreId();
-  try {
-    const res = await fetch('/api/pharmacy/inventory/add', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pharmacy_id: storeId,
-        med_name: medName,
-        stock_qty: qty,
-        mrp: 30.50,
-        batch_no: `BAT-REFILL-${Math.floor(Math.random()*900+100)}`,
-        expiry_date: "2028-12-31"
-      })
-    });
-    const data = await res.json();
-    alert(`Refilled +${qty} units of ${medName}!`);
-    loadPharmacyInventory(storeId);
-  } catch (err) {
-    alert("Refill failed.");
-  }
+  openQuickRefillModal(medId, medName);
 }
 
 // ==========================================
@@ -1794,9 +2888,9 @@ function openStoreProfileModal() {
   if (!modal) return;
 
   if (currentPharmacyStore) {
-    document.getElementById('editStoreName').value = currentPharmacyStore.name || 'Apollo Pharmacy - Downtown';
+    document.getElementById('editStoreName').value = currentPharmacyStore.name || 'Apollo Pharmacy - Palghar Station';
     document.getElementById('editStorePhone').value = currentPharmacyStore.phone || '+91 98201 12345';
-    document.getElementById('editStoreAddress').value = currentPharmacyStore.address || '101 Healthcare Blvd, Downtown Central';
+    document.getElementById('editStoreAddress').value = currentPharmacyStore.address || 'Station Road, Palghar West, Maharashtra - 401404';
   }
   modal.classList.add('active');
 }
@@ -2084,10 +3178,16 @@ async function loadAdminData() {
           ? `<button class="btn btn-primary" style="padding:4px 8px; font-size:11px;" onclick="togglePharmacyStatus('${p.id}', '${p.status}')">Reactivate Store</button>`
           : `<button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; color:var(--rose-danger);" onclick="togglePharmacyStatus('${p.id}', '${p.status}')">Suspend Authorization</button>`;
 
+        const coordsDisplay = (p.lat && p.lng)
+          ? `<span style="font-family:monospace; font-size:11px; color:var(--medical-blue);">📍 ${Number(p.lat).toFixed(4)}, ${Number(p.lng).toFixed(4)}</span>`
+          : '<span style="color:var(--text-muted); font-size:11px;">Not pinned</span>';
+
         pharmHtml += `
           <tr>
             <td><strong>${p.name}</strong></td>
             <td><code>${p.license}</code></td>
+            <td style="font-size:12px; max-width:200px; line-height:1.4;">${p.address || 'Palghar, Maharashtra'}</td>
+            <td>${coordsDisplay}</td>
             <td>${p.phone}</td>
             <td>${statusBadge}</td>
             <td>${actionBtn}</td>
@@ -2237,23 +3337,102 @@ function renderReminders() {
 }
 
 function addFamilyProfilePrompt() {
-  const name = prompt("Enter Member Name & Relation:");
+  const name = prompt("Enter Member Name & Relation (e.g. Sunita Sharma - Mother):");
   if (name) {
-    alert(`Added family profile: ${name}`);
+    alert(`✅ Family profile added: ${name}`);
     renderFamilyProfiles();
   }
 }
 
-async function promptUpdateMedicinePrice(medId, medName, currentPrice) {
-  const newPriceStr = prompt(`Update Store MRP / Selling Price for '${medName}':`, currentPrice);
-  if (!newPriceStr) return;
-  const newPrice = parseFloat(newPriceStr);
+function addReminderPrompt() {
+  const med  = prompt("Medicine name & dose (e.g. Dolo 650mg):");
+  if (!med) return;
+  const time = prompt("Reminder time(s) (e.g. 08:00 AM & 08:00 PM):", "08:00 AM");
+  if (!time) return;
+  showToast('Reminder Added', `⏰ Reminder set for ${med} at ${time}`, 'success');
+  // In a real app this would persist to DB/localStorage and trigger push notification
+}
+
+// ==========================================
+// INSTANT SKU PRICE & REFILL CONTROLLERS
+// ==========================================
+
+function openEditPriceModal(medId, fallbackName, fallbackPrice) {
+  const modal = document.getElementById('editPriceModal');
+  if (!modal) return;
+
+  const item = (window._storeInventoryMap && window._storeInventoryMap[medId]) || null;
+  const storeId = getStoreId();
+
+  const medName = item ? item.name : (fallbackName || 'Medicine SKU');
+  const genericDesc = item ? `${item.generic_name || ''} • ${item.category || ''} • Batch ${item.batch || ''}` : '';
+  const currentMrp = item ? Number(item.mrp || 0) : Number(fallbackPrice || 0);
+
+  const idInput = document.getElementById('editPriceMedId');
+  if (idInput) idInput.value = medId;
+  const storeInput = document.getElementById('editPriceStoreId');
+  if (storeInput) storeInput.value = storeId;
+  const nameEl = document.getElementById('editPriceMedName');
+  if (nameEl) nameEl.innerText = medName;
+  const genEl = document.getElementById('editPriceMedGeneric');
+  if (genEl) genEl.innerText = genericDesc;
+  const dispEl = document.getElementById('editPriceCurrentDisplay');
+  if (dispEl) dispEl.innerText = `₹ ${currentMrp.toFixed(2)}`;
+
+  const priceInput = document.getElementById('editPriceInput');
+  if (priceInput) {
+    priceInput.value = currentMrp > 0 ? currentMrp.toFixed(2) : '30.00';
+  }
+
+  modal.classList.add('active');
+
+  setTimeout(() => {
+    if (priceInput) {
+      priceInput.focus();
+      priceInput.select();
+    }
+  }, 60);
+}
+
+function closeEditPriceModal() {
+  const modal = document.getElementById('editPriceModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function adjustEditPrice(delta) {
+  const priceInput = document.getElementById('editPriceInput');
+  if (!priceInput) return;
+  const current = parseFloat(priceInput.value) || 0;
+  const nextVal = Math.max(1, current + delta);
+  priceInput.value = nextVal.toFixed(2);
+}
+
+function roundEditPrice() {
+  const priceInput = document.getElementById('editPriceInput');
+  if (!priceInput) return;
+  const current = parseFloat(priceInput.value) || 0;
+  priceInput.value = Math.ceil(current).toFixed(2);
+}
+
+async function handleEditPriceSubmit(e) {
+  if (e) e.preventDefault();
+  const medId = document.getElementById('editPriceMedId').value;
+  const storeId = document.getElementById('editPriceStoreId').value || getStoreId();
+  const priceInput = document.getElementById('editPriceInput');
+  const newPrice = parseFloat(priceInput ? priceInput.value : 0);
+
   if (isNaN(newPrice) || newPrice <= 0) {
-    alert("Invalid price value entered.");
+    showToast('Invalid Price', 'Please enter a valid selling price greater than ₹0.', 'warning');
     return;
   }
 
-  const storeId = getStoreId();
+  const saveBtn = document.getElementById('editPriceSaveBtn');
+  const origHtml = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  }
+
   try {
     const res = await fetch('/api/pharmacy/inventory/update-price', {
       method: 'POST',
@@ -2267,14 +3446,147 @@ async function promptUpdateMedicinePrice(medId, medName, currentPrice) {
 
     const data = await res.json();
     if (res.ok && data.status === 'SUCCESS') {
-      alert(`🎉 ${data.message}`);
+      // 1. Immediately update in-memory item
+      if (window._storeInventoryMap && window._storeInventoryMap[medId]) {
+        window._storeInventoryMap[medId].mrp = newPrice;
+      }
+
+      // 2. Immediately update cell price on page without waiting for fetch
+      const cellText = document.getElementById(`invPriceText_${medId}`);
+      if (cellText) {
+        cellText.innerText = `₹ ${newPrice.toFixed(2)}`;
+        cellText.style.color = 'var(--emerald-green)';
+        cellText.style.fontWeight = '700';
+      }
+
+      closeEditPriceModal();
+      showToast('Price Updated', `₹ ${newPrice.toFixed(2)} is now live across store SKU and patient searches!`, 'success');
+
+      // 3. Refresh background cache & patient search if open
       loadPharmacyInventory(storeId);
-      executePatientSearch(medName); // Immediately update price in Patient Search tab!
+      const medNameEl = document.getElementById('editPriceMedName');
+      if (medNameEl && medNameEl.innerText) {
+        executePatientSearch(medNameEl.innerText);
+      }
     } else {
-      alert(`Failed to update price: ${data.detail || 'Error'}`);
+      showToast('Price Update Failed', data.detail || 'Could not update medicine price', 'error');
     }
   } catch (err) {
-    alert("Price update network error.");
+    console.error("Price update error:", err);
+    showToast('Network Error', 'Failed to connect to pharmacy server.', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = origHtml;
+    }
+  }
+}
+
+// Fallback compatibility alias for any existing prompt callers
+async function promptUpdateMedicinePrice(medId, medName, currentPrice) {
+  openEditPriceModal(medId, medName, currentPrice);
+}
+
+// Quick Refill Modal Controllers
+function openQuickRefillModal(medId, fallbackName) {
+  const modal = document.getElementById('quickRefillModal');
+  if (!modal) return;
+
+  const item = (window._storeInventoryMap && window._storeInventoryMap[medId]) || null;
+  const storeId = getStoreId();
+
+  const medName = item ? item.name : (fallbackName || 'Medicine SKU');
+  const currentStock = item ? Number(item.stock || 0) : 0;
+  const cat = item ? `${item.category || ''} • Batch: ${item.batch || ''}` : '';
+
+  const idInput = document.getElementById('quickRefillMedId');
+  if (idInput) idInput.value = medId;
+  const storeInput = document.getElementById('quickRefillStoreId');
+  if (storeInput) storeInput.value = storeId;
+  const nameEl = document.getElementById('quickRefillMedName');
+  if (nameEl) nameEl.innerText = medName;
+  const catEl = document.getElementById('quickRefillCategory');
+  if (catEl) catEl.innerText = cat;
+  const stockEl = document.getElementById('quickRefillCurrentStock');
+  if (stockEl) stockEl.innerText = `${currentStock} Units`;
+
+  const qtyInput = document.getElementById('quickRefillQtyInput');
+  if (qtyInput) qtyInput.value = '50';
+
+  modal.classList.add('active');
+
+  setTimeout(() => {
+    if (qtyInput) {
+      qtyInput.focus();
+      qtyInput.select();
+    }
+  }, 60);
+}
+
+function closeQuickRefillModal() {
+  const modal = document.getElementById('quickRefillModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function setRefillQty(qty) {
+  const qtyInput = document.getElementById('quickRefillQtyInput');
+  if (qtyInput) qtyInput.value = qty;
+}
+
+async function handleQuickRefillSubmit(e) {
+  if (e) e.preventDefault();
+  const medId = document.getElementById('quickRefillMedId').value;
+  const storeId = document.getElementById('quickRefillStoreId').value || getStoreId();
+  const item = (window._storeInventoryMap && window._storeInventoryMap[medId]) || null;
+
+  const qtyInput = document.getElementById('quickRefillQtyInput');
+  const qty = parseInt(qtyInput ? qtyInput.value : 0);
+
+  if (isNaN(qty) || qty <= 0) {
+    showToast('Invalid Quantity', 'Please enter at least 1 unit to refill.', 'warning');
+    return;
+  }
+
+  const saveBtn = document.getElementById('quickRefillSaveBtn');
+  const origHtml = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding Stock...';
+  }
+
+  const medName = item ? item.name : (document.getElementById('quickRefillMedName').innerText || 'Medicine');
+  const mrp = item ? item.mrp : 45.00;
+
+  try {
+    const res = await fetch('/api/pharmacy/inventory/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pharmacy_id: storeId,
+        med_name: medName,
+        stock_qty: qty,
+        mrp: mrp,
+        batch_no: item ? item.batch : `BAT-REFILL-${Math.floor(Math.random()*900+100)}`,
+        expiry_date: item ? item.expiry : "2028-12-31"
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status === 'SUCCESS') {
+      closeQuickRefillModal();
+      showToast('Stock Refilled', `Added +${qty} units of ${medName} to store inventory!`, 'success');
+      loadPharmacyInventory(storeId);
+    } else {
+      showToast('Refill Failed', data.detail || 'Could not add stock units.', 'error');
+    }
+  } catch (err) {
+    console.error("Refill error:", err);
+    showToast('Network Error', 'Failed to connect to pharmacy server.', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = origHtml;
+    }
   }
 }
 
