@@ -400,6 +400,7 @@ body.rural-mode-active .rural-mode-indicator {
 }
 
 .hero-title span {
+  display: block;
   background: linear-gradient(135deg, var(--medical-blue), var(--teal-accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

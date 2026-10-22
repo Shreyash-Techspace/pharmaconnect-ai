@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const TRANSLATIONS = {
   en: {
-    hero_title: "Find Medicines Faster. <span>Deliver Care Smarter.</span>",
+    hero_title: "Find Medicines Faster.<br><span>Deliver Care Smarter.</span>",
     hero_subheading: "Locate medicines instantly across connected pharmacies, reserve stock with digital QR receipts, upload prescriptions for AI OCR analysis, dispatch 24/7 emergency deliveries, and forecast stock shortages before they happen.",
     btn_search: "Search Medicines",
     btn_register_pharmacy: "Register Pharmacy",
@@ -124,7 +124,7 @@ const TRANSLATIONS = {
     role_admin: "Admin"
   },
   hi: {
-    hero_title: "दवाइयां तेज़ी से खोजें। <span>स्वास्थ्य सेवा बेहतर बनाएं।</span>",
+    hero_title: "दवाइयां तेज़ी से खोजें।<br><span>स्वास्थ्य सेवा बेहतर बनाएं।</span>",
     hero_subheading: "आस-पास के मेडिकल स्टोर में तुरंत दवाएं खोजें, डिजिटल QR रसीद के साथ स्टॉक बुक करें, AI द्वारा नुस्खा स्कैन करें और आपातकालीन डिलीवरी प्राप्त करें।",
     btn_search: "दवाइयां खोजें",
     btn_register_pharmacy: "मेडिकल स्टोर पंजीकृत करें",
@@ -137,7 +137,7 @@ const TRANSLATIONS = {
     role_admin: "एडमिन"
   },
   mr: {
-    hero_title: "औषधे जलद शोधा. <span>आरोग्यसेवा अधिक प्रभावी करा.</span>",
+    hero_title: "औषधे जलद शोधा.<br><span>आरोग्यसेवा अधिक प्रभावी करा.</span>",
     hero_subheading: "जवळच्या फार्मसीमध्ये औषधांची उपलब्धता तपासा, डिजिटल पावतीसह पावती आरक्षित करा, AI याद्वारे प्रिस्क्रिप्शन स्कैन करा आणि तातडीची डिलिव्हरी मिळवा.",
     btn_search: "औषधे शोधा",
     btn_register_pharmacy: "फार्मसी नोंदणी करा",
