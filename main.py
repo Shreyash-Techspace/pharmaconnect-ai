@@ -671,6 +671,13 @@ async def send_otp(req: SendOTPRequest):
     }
     is_demo = email in demo_emails
 
+    # Enforce real email delivery for non-demo accounts
+    if not is_demo and not sent_email:
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to dispatch email OTP. Gmail credentials (GMAIL_USER & GMAIL_APP_PASSWORD) are not yet set in Vercel Environment Variables."
+        )
+
     return {
         "status": "SUCCESS",
         "message": f"Security OTP dispatched to {email}" + (f" and {phone}" if phone else ""),
@@ -679,7 +686,6 @@ async def send_otp(req: SendOTPRequest):
         "email": email,
         "phone": phone,
         "otp_demo": otp if is_demo else None,
-        "otp_code": otp if not sent_email else None,  # Real-time fallback code when SMTP unconfigured
         "expires_in_minutes": 10
     }
 
@@ -785,11 +791,17 @@ async def login_user(req: LoginRequest):
         if user_phone:
             send_otp_sms(user_phone, otp, user["name"])
 
+        # Enforce real email delivery for non-demo accounts
+        if not is_demo and not sent_email:
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to dispatch 2FA login OTP. Gmail credentials (GMAIL_USER & GMAIL_APP_PASSWORD) are not yet set in Vercel Environment Variables."
+            )
+
         return {
             "status": "OTP_REQUIRED",
-            "message": "Password verified! OTP sent to your registered email address.",
+            "message": "Password verified! 6-digit OTP sent to your registered email address.",
             "otp_demo": otp if is_demo else None,
-            "otp_code": otp if not sent_email else None,  # Real-time fallback code when SMTP unconfigured
             "sent_via_email": sent_email,
             "phone": user_phone,
             "email": user["email"],

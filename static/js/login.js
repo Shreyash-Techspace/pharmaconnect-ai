@@ -253,29 +253,21 @@ async function handleLoginStep1(e) {
 
       const alertBox = document.getElementById('otpDemoAlert');
 
-      if (_isDemo) {
-        // Demo account: OTP auto-filled in the box
+      if (_isDemo && data.otp_demo) {
+        // Demo account (1-Click quick testing accounts only)
         alertBox.style.display = 'inline-block';
-        alertBox.innerHTML = `🔒 Demo OTP: <strong>${data.otp_demo}</strong>`;
+        alertBox.innerHTML = `🔒 Demo Account OTP: <strong>${data.otp_demo}</strong>`;
         document.getElementById('otpInput').value = data.otp_demo;
-        loginToast('Demo Login', 'OTP auto-filled for demo account.', 'info');
-      } else if (data.sent_via_email) {
-        // Real account: backend sent OTP to Gmail
-        alertBox.style.display = 'inline-block';
-        alertBox.innerHTML = `✉️ Real OTP dispatched to <strong>${email}</strong>` + (data.phone ? ` & SMS to <strong>${data.phone}</strong>` : '') + `<br><small style="color:#94a3b8;">Check your Gmail inbox and phone messages.</small>`;
+        loginToast('Demo Account', 'OTP auto-filled for quick demo test.', 'info');
+      } else {
+        // Real Enterprise Account: code sent to Gmail inbox only
+        alertBox.style.display = 'none';
+        document.getElementById('otpInput').value = '';
         loginToast(
           '📧 OTP Sent to Gmail',
           `A 6-digit code was sent to ${email}. Check your inbox.`,
           'success'
         );
-      } else {
-        // Real account where Gmail SMTP is not configured on server yet
-        alertBox.style.display = 'inline-block';
-        alertBox.innerHTML = `🔒 Real-Time Security OTP: <strong>${data.otp_code || data.otp_demo}</strong>` + (data.phone ? `<br><small style="color:#38bdf8;">📱 Mobile SMS dispatched to: ${data.phone}</small>` : '') + `<br><small style="color:#94a3b8;">(Gmail SMTP unconfigured on server; use code above)</small>`;
-        if (data.otp_code || data.otp_demo) {
-          document.getElementById('otpInput').value = data.otp_code || data.otp_demo;
-        }
-        loginToast('Security OTP Ready', 'Enter code above to verify.', 'info');
       }
 
     } else if (data.status === 'SUCCESS') {
@@ -342,19 +334,13 @@ async function resendOtp() {
     const data = await res.json();
 
     if (_isDemo && data.otp_demo) {
-      document.getElementById('otpDemoAlert').innerHTML = `🔒 New Demo OTP: <strong>${data.otp_demo}</strong>`;
-      document.getElementById('otpInput').value = data.otp_demo;
-      loginToast('OTP Resent', 'New demo OTP auto-filled.', 'info');
-    } else if (data.sent_via_email) {
-      document.getElementById('otpDemoAlert').innerHTML = `✉️ New code sent to <strong>${_pendingEmail}</strong>. Check your Gmail inbox.`;
-      loginToast('📧 OTP Resent', `New code sent to ${_pendingEmail}.`, 'success');
-    } else {
       document.getElementById('otpDemoAlert').style.display = 'inline-block';
-      document.getElementById('otpDemoAlert').innerHTML = `🔒 New Security OTP: <strong>${data.otp_code || data.otp_demo}</strong>`;
-      if (data.otp_code || data.otp_demo) {
-        document.getElementById('otpInput').value = data.otp_code || data.otp_demo;
-      }
-      loginToast('New Code Generated', 'Use code above to verify.', 'info');
+      document.getElementById('otpDemoAlert').innerHTML = `🔒 Demo Account OTP: <strong>${data.otp_demo}</strong>`;
+      document.getElementById('otpInput').value = data.otp_demo;
+      loginToast('OTP Resent', 'Demo OTP auto-filled.', 'info');
+    } else {
+      document.getElementById('otpDemoAlert').style.display = 'none';
+      loginToast('📧 OTP Resent', `New 6-digit code sent to ${_pendingEmail}. Check your inbox.`, 'success');
     }
   } catch {
     loginToast('Error', 'Could not resend OTP. Is the server running?', 'error');
@@ -485,21 +471,12 @@ async function handleRegStep1(e) {
     document.getElementById('regStep1').style.display = 'none';
     document.getElementById('regStep2').style.display = 'block';
     document.getElementById('regOtpTargetEmail').innerText = email;
-    document.getElementById('regOtpTargetPhone').innerText = `📱 Mobile SMS: ${phone}`;
+    document.getElementById('regOtpTargetPhone').innerText = phone ? `📱 Registered Mobile: ${phone}` : '';
+    document.getElementById('regOtpInput').value = '';
 
     const regAlert = document.getElementById('regOtpAlert');
-    if (data.sent_via_email) {
-      regAlert.style.display = 'inline-block';
-      regAlert.innerHTML = `✉️ Real OTP dispatched to <strong>${email}</strong> & SMS to <strong>${phone}</strong>.<br><small style="color:#94a3b8;">Check your Gmail inbox and phone messages.</small>`;
-      loginToast('✅ OTP Dispatched', `Code sent to ${email} & ${phone}.`, 'success');
-    } else {
-      regAlert.style.display = 'inline-block';
-      regAlert.innerHTML = `🔒 Real-Time Verification OTP: <strong>${data.otp_code || data.otp_demo}</strong><br><small style="color:#38bdf8;">📱 Mobile SMS dispatched to: ${phone}</small><br><small style="color:#94a3b8;">(Live Gmail SMTP unconfigured on server; use code above)</small>`;
-      if (data.otp_code || data.otp_demo) {
-        document.getElementById('regOtpInput').value = data.otp_code || data.otp_demo;
-      }
-      loginToast('Security OTP Ready', 'Enter verification code to complete registration.', 'info');
-    }
+    regAlert.style.display = 'none';
+    loginToast('✅ OTP Dispatched', `6-digit security code sent to ${email}. Check your Gmail inbox.`, 'success');
     document.getElementById('regOtpInput').focus();
   } catch (err) {
     loginToast('Connection Error', 'Cannot reach server. Make sure it is running.', 'error');
@@ -570,16 +547,10 @@ async function resendRegOtp() {
     const data = await res.json();
     if (res.ok) {
       const regAlert = document.getElementById('regOtpAlert');
-      if (data.sent_via_email) {
-        regAlert.innerHTML = `✉️ Real OTP resent to <strong>${_pendingRegData.email}</strong> & SMS to <strong>${_pendingRegData.phone}</strong>.`;
-        loginToast('OTP Resent', `New code sent to ${_pendingRegData.email}`, 'success');
-      } else {
-        regAlert.innerHTML = `🔒 New Security OTP: <strong>${data.otp_code || data.otp_demo}</strong>`;
-        if (data.otp_code || data.otp_demo) {
-          document.getElementById('regOtpInput').value = data.otp_code || data.otp_demo;
-        }
-        loginToast('New Code Generated', 'Use code above to verify.', 'info');
-      }
+      regAlert.style.display = 'none';
+      loginToast('OTP Resent', `New 6-digit code sent to ${_pendingRegData.email}. Check your inbox.`, 'success');
+    } else {
+      loginToast('Error', data.detail || 'Could not resend OTP.', 'error');
     }
   } catch {
     loginToast('Error', 'Could not resend OTP.', 'error');
