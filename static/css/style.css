@@ -835,7 +835,7 @@ body.rural-mode-active .rural-mode-indicator {
 
   /* Space main content so bottom bar never covers anything */
   main.container {
-    padding-bottom: 88px !important;
+    padding-bottom: 124px !important;
   }
 
   /* Hero Section for Mobile */
@@ -992,16 +992,16 @@ body.rural-mode-active .rural-mode-indicator {
 
   /* Floating Chatbot Widget positioned safely above bottom navigation bar */
   .chatbot-widget-container {
-    bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
     left: auto !important;
-    right: 16px !important;
+    right: 14px !important;
     z-index: 3100 !important;
   }
   .chatbot-toggle-btn {
-    width: 50px;
-    height: 50px;
-    font-size: 21px;
-    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);
+    width: 46px;
+    height: 46px;
+    font-size: 20px;
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45);
   }
   .chatbot-window {
     position: fixed !important;

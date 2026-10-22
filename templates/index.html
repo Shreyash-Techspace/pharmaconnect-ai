@@ -40,8 +40,8 @@
   </script>
 
   <!-- Global Application Styles -->
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261023_01">
+  <link rel="stylesheet" href="/static/css/components.css?v=20261023_01">
 
   <!-- Google Maps: loaded ONLY when a valid API key is configured -->
   <!-- Map falls back to Leaflet/OpenStreetMap if no key is set     -->
@@ -372,11 +372,11 @@
               </div>
 
               <!-- Search/Sort Inside Nearby Facilities -->
-              <div style="display: flex; gap: 8px; align-items: center;">
+              <div class="facility-filter-toolbar">
                 <input type="text" id="facilitySearchInput" placeholder="Filter by name or street..." oninput="handleFacilitySearch(this.value)"
-                       style="padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); min-width: 200px;">
+                       class="facility-search-input">
                 <select id="facilitySortSelect" onchange="handleFacilitySort(this.value)"
-                        style="padding: 6px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-primary);">
+                        class="facility-sort-select">
                   <option value="distance">Nearest Distance</option>
                   <option value="rating">Highest Rated</option>
                   <option value="name">Name (A-Z)</option>
@@ -385,7 +385,7 @@
             </div>
 
             <!-- Facilities Cards Grid Container -->
-            <div id="nearbyFacilitiesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
+            <div id="nearbyFacilitiesContainer" class="nearby-facilities-grid">
               <!-- Populated dynamically via app.js -->
               <div style="text-align:center; padding:30px; color:var(--text-muted); grid-column:1/-1;">
                 <i class="fa-solid fa-spinner fa-spin" style="font-size:24px;"></i> Loading surrounding healthcare facilities...
@@ -1808,7 +1808,7 @@
   </aside>
 
   <!-- Application Logic Scripts -->
-  <script src="/static/js/app.js?v=20261022_03"></script>
+  <script src="/static/js/app.js?v=20261023_01"></script>
 </body>
 </html>
 

@@ -212,17 +212,80 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   background: var(--bg-card);
   transition: var(--transition-fast);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .store-avail-card:hover {
   border-color: var(--medical-blue);
   box-shadow: var(--shadow-sm);
+}
+
+.store-avail-info {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.store-avail-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.store-avail-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.store-avail-meta .meta-sep {
+  color: var(--text-muted);
+}
+
+.store-avail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.store-avail-stock-box {
+  text-align: right;
+}
+
+.store-avail-stock-status {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.store-avail-eta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.store-avail-btn {
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Leaflet Map Wrapper */
@@ -880,12 +943,129 @@
   box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
 }
 
+/* Facility Card Component */
+.nearby-facilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.facility-filter-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.facility-search-input {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  min-width: 180px;
+  box-sizing: border-box;
+}
+
+.facility-sort-select {
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.facility-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
 .facility-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-md) !important;
   border-color: rgba(2, 132, 199, 0.35) !important;
 }
 
+.facility-card-body {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.facility-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.facility-distance-badge {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--medical-blue);
+  background: var(--bg-subtle);
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.facility-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.facility-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.facility-action-btn {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 100px;
+  padding: 7px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.facility-action-btn.btn-facility-emergency {
+  background: var(--rose-danger);
+  border-color: var(--rose-danger);
+  color: #ffffff;
+}
+
+/* ── Mobile Breakpoint Responsiveness (<= 768px) ── */
 @media (max-width: 768px) {
   .map-toolbar {
     flex-direction: column;
@@ -895,6 +1075,70 @@
     width: 100%;
     overflow-x: auto;
     padding-bottom: 4px;
+  }
+}
+
+/* ── Portrait Mobile Breakpoint Responsiveness (<= 640px) ── */
+@media (max-width: 640px) {
+  .nearby-facilities-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .facility-filter-toolbar {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .facility-search-input,
+  .facility-sort-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Store availability card switches to stacked row on mobile */
+  .store-avail-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .store-avail-actions {
+    width: 100%;
+    justify-content: space-between;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 10px;
+    align-items: center;
+  }
+
+  .store-avail-stock-box {
+    text-align: left;
+  }
+
+  .store-avail-btn {
+    width: auto;
+    min-width: 110px;
+    justify-content: center;
+  }
+}
+
+/* ── Narrow Mobile Phones (<= 420px) ── */
+@media (max-width: 420px) {
+  .facility-action-btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .store-avail-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .store-avail-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

@@ -1558,44 +1558,42 @@ function _renderNearbyFacilitiesList() {
 
     const cleanName = (f.name || '').replace(/'/g, "\\'");
     const primaryAction = isPharm
-      ? `<button class="btn btn-primary" onclick="openFacilityMedicinesModal('${f.id}', '${cleanName}', 'pharmacy')" style="padding: 6px 12px; font-size: 12px; flex: 1;">
+      ? `<button class="btn btn-primary facility-action-btn" onclick="openFacilityMedicinesModal('${f.id}', '${cleanName}', 'pharmacy')">
            <i class="fa-solid fa-cart-shopping"></i> Order Meds (${f.total_stock || 0})
          </button>`
-      : `<div style="display:flex; gap:6px; flex:1;">
-           <button class="btn btn-primary" onclick="openFacilityMedicinesModal('${f.id}', '${cleanName}', 'hospital')" style="padding: 6px 10px; font-size: 12px; flex: 1; background: var(--medical-blue); border-color: var(--medical-blue);">
-             <i class="fa-solid fa-pills"></i> Hospital Meds (${f.total_stock || 0})
-           </button>
-           <button class="btn btn-primary" onclick="openEmergencyModalForHospital('${cleanName}')" style="padding: 6px 10px; font-size: 12px; background:var(--rose-danger); border-color:var(--rose-danger); flex: 1;">
-             <i class="fa-solid fa-truck-medical"></i> Emergency
-           </button>
-         </div>`;
+      : `<button class="btn btn-primary facility-action-btn" onclick="openFacilityMedicinesModal('${f.id}', '${cleanName}', 'hospital')" style="background: var(--medical-blue); border-color: var(--medical-blue);">
+           <i class="fa-solid fa-pills"></i> Hospital Meds (${f.total_stock || 0})
+         </button>
+         <button class="btn btn-primary facility-action-btn btn-facility-emergency" onclick="openEmergencyModalForHospital('${cleanName}')" style="background:var(--rose-danger); border-color:var(--rose-danger);">
+           <i class="fa-solid fa-truck-medical"></i> Emergency
+         </button>`;
 
     html += `
-      <div class="facility-card" id="card-facility-${f.id}" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm); transition: transform 0.2s, box-shadow 0.2s;">
-        <div>
+      <div class="facility-card" id="card-facility-${f.id}">
+        <div class="facility-card-body">
           <!-- Header: Category Badge + Distance -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div class="facility-card-header">
             <span style="background: ${badgeBg}; color: ${badgeColor}; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
               ${typeLabel}
             </span>
-            <span style="font-size: 12px; font-weight: 800; color: var(--medical-blue); background: var(--bg-subtle); padding: 2px 8px; border-radius: 12px;">
+            <span class="facility-distance-badge">
               📍 ${f.distance_km != null ? f.distance_km + ' km' : 'Nearby'}
             </span>
           </div>
 
           <!-- Facility Name & Rating -->
-          <h4 style="font-size: 15px; font-weight: 800; color: var(--text-primary); margin: 0 0 6px 0; line-height: 1.3;">
+          <h4 class="facility-card-title">
             ${f.name}
           </h4>
 
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 8px; flex-wrap: wrap;">
             <span style="color: #f59e0b; font-weight: 700;"><i class="fa-solid fa-star"></i> ${f.rating || '4.8'}</span>
             <span style="color: var(--text-muted);">&bull;</span>
             ${statusPill}
           </div>
 
           <!-- Address & Phone -->
-          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5;">
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; word-break: break-word;">
             <div><i class="fa-solid fa-location-dot" style="color:var(--text-muted); width:14px;"></i> ${f.address}</div>
             <div style="margin-top: 3px;"><i class="fa-solid fa-phone" style="color:var(--text-muted); width:14px;"></i> <a href="tel:${f.phone}" style="color:var(--medical-blue); font-weight:600; text-decoration:none;">${f.phone}</a></div>
           </div>
@@ -1607,8 +1605,8 @@ function _renderNearbyFacilitiesList() {
         </div>
 
         <!-- Action Buttons -->
-        <div style="display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
-          <button class="btn btn-secondary" onclick="focusFacilityOnMap('${f.id}')" style="padding: 6px 10px; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+        <div class="facility-card-actions">
+          <button class="btn btn-secondary facility-action-btn" onclick="focusFacilityOnMap('${f.id}')">
             <i class="fa-solid fa-map-pin" style="color:var(--emerald-green);"></i> View on Map
           </button>
           ${primaryAction}
@@ -1822,7 +1820,7 @@ function renderFacilityMedicinesList(medicines) {
   const facId = fac.id;
   const facName = fac.name.replace(/'/g, "\\'");
 
-  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px;">`;
+  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap:14px;">`;
 
   medicines.forEach(m => {
     const isRx = m.prescription_required;
@@ -2240,12 +2238,12 @@ async function executePatientSearch(customQuery = null) {
       const med = item.medicine;
       html += `
         <div class="card" style="margin-bottom: 20px; border-left: 4px solid var(--medical-blue);">
-          <div class="flex-between" style="margin-bottom: 10px;">
-            <div>
-              <h3 style="font-family:var(--font-heading); font-size:22px; color:var(--text-primary);">${med.name}</h3>
+          <div class="flex-between med-search-header" style="margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <div style="flex: 1 1 200px; min-width: 0;">
+              <h3 style="font-family:var(--font-heading); font-size:22px; color:var(--text-primary); word-break: break-word;">${med.name}</h3>
               <p style="font-size:13px; color:var(--text-secondary);">${med.generic_name} • <span style="color:var(--medical-blue); font-weight:600;">${med.category}</span></p>
             </div>
-            <div style="text-align:right;">
+            <div class="med-search-price-col" style="text-align:right;">
               <span class="badge ${med.prescription_required ? 'badge-warning' : 'badge-green'}">${med.prescription_required ? 'Rx Prescription Required' : 'OTC Available'}</span>
               <div style="font-size:20px; font-weight:800; color:var(--emerald-green); margin-top:4px;">₹ ${med.mrp.toFixed(2)}</div>
             </div>
@@ -2262,22 +2260,26 @@ async function executePatientSearch(customQuery = null) {
       item.availability.forEach(store => {
         const isStockAvailable = store.stock > 0 && store.is_open;
         html += `
-          <div class="store-avail-card" style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-subtle); padding:12px; border-radius:8px; margin-bottom:8px;">
-            <div>
-              <div style="font-weight:700; font-size:15px; color:var(--text-primary);">${store.pharmacy_name}</div>
-              <div style="font-size:12px; color:var(--text-secondary);">
-                📍 ${store.distance} away • ⭐ ${store.rating} • ${store.is_open ? '🟢 Open Now' : '🔴 Closed'}
+          <div class="store-avail-card">
+            <div class="store-avail-info">
+              <div class="store-avail-name">${store.pharmacy_name}</div>
+              <div class="store-avail-meta">
+                <span>📍 ${store.distance} away</span>
+                <span class="meta-sep">•</span>
+                <span>⭐ ${store.rating}</span>
+                <span class="meta-sep">•</span>
+                <span>${store.is_open ? '<span style="color:var(--emerald-green); font-weight:600;">🟢 Open Now</span>' : '<span style="color:var(--rose-danger); font-weight:600;">🔴 Closed</span>'}</span>
               </div>
             </div>
 
-            <div style="display:flex; align-items:center; gap:12px;">
-              <div style="text-align:right;">
-                <div style="font-size:14px; font-weight:700; color:${isStockAvailable ? 'var(--emerald-green)' : 'var(--rose-danger)'};">
+            <div class="store-avail-actions">
+              <div class="store-avail-stock-box">
+                <div class="store-avail-stock-status" style="color:${isStockAvailable ? 'var(--emerald-green)' : 'var(--rose-danger)'};">
                   ${store.stock > 0 ? store.stock + ' Units Available' : 'Out of Stock'}
                 </div>
-                <div style="font-size:11px; color:var(--text-muted);">ETA: ${store.delivery_eta}</div>
+                <div class="store-avail-eta">ETA: ${store.delivery_eta}</div>
               </div>
-              <button class="btn btn-primary" ${!isStockAvailable ? 'disabled style="opacity:0.5;"' : ''} onclick="addToCart('${med.id}', '${med.name}', '${med.generic_name}', ${store.price}, '${store.pharmacy_id}', '${store.pharmacy_name}')">
+              <button class="btn btn-primary store-avail-btn" ${!isStockAvailable ? 'disabled style="opacity:0.5;"' : ''} onclick="addToCart('${med.id}', '${med.name}', '${med.generic_name}', ${store.price}, '${store.pharmacy_id}', '${store.pharmacy_name}')">
                 <i class="fa-solid fa-cart-plus"></i> Add to Cart
               </button>
             </div>
