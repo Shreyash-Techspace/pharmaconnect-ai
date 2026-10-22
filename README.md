@@ -5,15 +5,17 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-success?style=for-the-badge&logo=vercel&logoColor=white)](https://pharmaconnect-ai-hdgu.vercel.app/)
 [![SQLite](https://img.shields.io/badge/SQLite3-Database-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/Deploy-Vercel%20%7C%20Render-black?style=for-the-badge&logo=vercel)](https://vercel.com)
+[![Platform](https://img.shields.io/badge/Deploy-Vercel%20%7C%20Render-black?style=for-the-badge&logo=vercel)](https://pharmaconnect-ai-hdgu.vercel.app/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](CONTRIBUTING.md)
 
 <p align="center">
   <strong>Pharma-Connect AI</strong> bridges the critical gap between patients, verified pharmacies, and emergency healthcare facilities. Featuring real-time GPS drug availability tracking, AI-powered prescription & invoice scanners, predictive demand forecasting, emergency dispatch routing, and smart medicine donation networks.
 </p>
 
+[🌐 Live Demo](https://pharmaconnect-ai-hdgu.vercel.app/) •
 [Explore Features](#-key-features) •
 [System Architecture](#-system-architecture) •
 [Quick Start](#-quick-start-guide) •
@@ -22,6 +24,10 @@
 [Deployment](#-deployment-guide)
 
 </div>
+
+> [!TIP]
+> 🚀 **Live Demo Available:** Test Pharma-Connect AI live in production at **[https://pharmaconnect-ai-hdgu.vercel.app/](https://pharmaconnect-ai-hdgu.vercel.app/)**.  
+> Log in directly with any of the pre-seeded [Demo Credentials](#-demo-accounts).
 
 ---
 
@@ -381,7 +387,7 @@ Create a `.env` file in the root directory. You can copy the template from [`.en
 
 ## 👥 Demo Accounts
 
-The database comes pre-seeded with active test credentials across all platform roles:
+The platform comes pre-seeded with active test credentials across all healthcare roles. You can test these instantly on the [Live Web Application](https://pharmaconnect-ai-hdgu.vercel.app/login):
 
 | Role | Email Address | Password | Details / Permissions |
 | :--- | :--- | :--- | :--- |
@@ -457,7 +463,9 @@ The repository includes a ready-to-use [`render.yaml`](render.yaml) blueprint:
 ---
 
 ### Deploy to Vercel
-Configured for zero-config Vercel Serverless deployment via [`vercel.json`](vercel.json) and [`api/index.py`](api/index.py):
+Configured for zero-config Vercel Serverless deployment via [`vercel.json`](vercel.json) and [`api/index.py`](api/index.py).  
+Our official production deployment is hosted at: **[https://pharmaconnect-ai-hdgu.vercel.app/](https://pharmaconnect-ai-hdgu.vercel.app/)**
+
 1. Install the Vercel CLI:
    ```bash
    npm install -g vercel
