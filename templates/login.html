@@ -890,112 +890,148 @@
 
         </div>
 
-        <!-- ── REGISTER FORM ── -->
+        <!-- ── REGISTER SECTION ── -->
         <div id="registerSection" style="display:none;">
-          <form onsubmit="handleRegister(event)">
-            <div class="form-group">
-              <label class="form-label">Account Type</label>
-              <select id="regRole" class="form-select" onchange="togglePharmacyField()">
-                <option value="patient">👤 Patient / General Public</option>
-                <option value="pharmacy">🏪 Pharmacy Store Owner</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Full Name</label>
-              <div class="input-wrapper">
-                <i class="fa-solid fa-user input-icon"></i>
-                <input type="text" id="regName" class="form-input" placeholder="Your full name" required>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Email Address</label>
-              <div class="input-wrapper">
-                <i class="fa-solid fa-envelope input-icon"></i>
-                <input type="email" id="regEmail" class="form-input" placeholder="you@example.com" required>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Phone Number</label>
-              <div class="input-wrapper">
-                <i class="fa-solid fa-phone input-icon"></i>
-                <input type="text" id="regPhone" class="form-input" placeholder="+91 98000 00000" required>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Password</label>
-              <div class="input-wrapper">
-                <i class="fa-solid fa-lock input-icon"></i>
-                <input type="password" id="regPassword" class="form-input" placeholder="••••••••" required
-                  oninput="checkPwdStrength(this.value)">
-                <button type="button" class="eye-btn" onclick="toggleEye('regPassword', this)">
-                  <i class="fa-solid fa-eye"></i>
-                </button>
-              </div>
-              <div class="pwd-strength-bar">
-                <div class="pwd-strength-fill" id="pwdFill"></div>
-              </div>
-              <div class="pwd-strength-text" id="pwdText">Enter password</div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Street Address / Store Location</label>
-              <input type="text" id="regAddress" class="form-input"
-                placeholder="e.g. Station Road, Palghar West, Maharashtra" required>
-            </div>
-            <div id="regPharmacyFields" style="display:none;">
+
+          <!-- Step 1: Account Details -->
+          <div id="regStep1">
+            <form onsubmit="handleRegStep1(event)">
               <div class="form-group">
-                <label class="form-label"><i class="fa-solid fa-certificate"></i> Drug License No. (DL No.)</label>
-                <input type="text" id="regLicense" class="form-input" placeholder="DL-2026-AP1234">
+                <label class="form-label">Account Type</label>
+                <select id="regRole" class="form-select" onchange="togglePharmacyField()">
+                  <option value="patient">👤 Patient / General Public</option>
+                  <option value="pharmacy">🏪 Pharmacy Store Owner</option>
+                </select>
               </div>
-
-              <!-- Pharmacy GPS Location Pinning -->
-              <div class="form-group"
-                style="background: rgba(14, 165, 233, 0.07); border: 1px dashed rgba(14, 165, 233, 0.4); border-radius: 8px; padding: 12px; margin-top: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label class="form-label" style="margin: 0; font-weight: 700; color: #0284c7;">
-                    <i class="fa-solid fa-map-location-dot"></i> Store GPS Location Pin
-                  </label>
-                  <span
-                    style="background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px;">Map
-                    Visible</span>
-                </div>
-                <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
-                  Your store will be visible to Patients & Admins on the live medicine map and nearby medical stores
-                  directory.
-                </p>
-
-                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                  <button type="button" class="btn-secondary" onclick="detectStoreLocation()"
-                    style="font-size: 12px; padding: 6px 12px; flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;">
-                    <i class="fa-solid fa-crosshairs" style="color:#0284c7;"></i> Detect Current GPS
-                  </button>
-                  <button type="button" class="btn-secondary" onclick="setDemoStoreLocationPalghar()"
-                    style="font-size: 12px; padding: 6px 12px; flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;">
-                    <i class="fa-solid fa-city" style="color:#10b981;"></i> Palghar Demo
-                  </button>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                  <div>
-                    <label style="font-size: 11px; color: #64748b; font-weight:600;">Latitude</label>
-                    <input type="number" step="0.00001" id="regLat" class="form-input" placeholder="19.6967"
-                      style="font-size: 12px; padding: 6px 10px;">
-                  </div>
-                  <div>
-                    <label style="font-size: 11px; color: #64748b; font-weight:600;">Longitude</label>
-                    <input type="number" step="0.00001" id="regLng" class="form-input" placeholder="72.7699"
-                      style="font-size: 12px; padding: 6px 10px;">
-                  </div>
-                </div>
-                <div id="storeLocationStatus"
-                  style="font-size: 11px; color: #0284c7; margin-top: 6px; font-weight: 600;">
-                  📍 Selected: Palghar, Maharashtra (Demo Area)
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-user input-icon"></i>
+                  <input type="text" id="regName" class="form-input" placeholder="Your full name" required>
                 </div>
               </div>
+              <div class="form-group">
+                <label class="form-label">Email Address (Gmail / Corporate)</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-envelope input-icon"></i>
+                  <input type="email" id="regEmail" class="form-input" placeholder="you@example.com" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Phone Number (with Country Code)</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-phone input-icon"></i>
+                  <input type="text" id="regPhone" class="form-input" placeholder="+91 98000 00000" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-lock input-icon"></i>
+                  <input type="password" id="regPassword" class="form-input" placeholder="••••••••" required
+                    oninput="checkPwdStrength(this.value)">
+                  <button type="button" class="eye-btn" onclick="toggleEye('regPassword', this)">
+                    <i class="fa-solid fa-eye"></i>
+                  </button>
+                </div>
+                <div class="pwd-strength-bar">
+                  <div class="pwd-strength-fill" id="pwdFill"></div>
+                </div>
+                <div class="pwd-strength-text" id="pwdText">Enter password</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Street Address / Store Location</label>
+                <input type="text" id="regAddress" class="form-input"
+                  placeholder="e.g. Station Road, Palghar West, Maharashtra" required>
+              </div>
+              <div id="regPharmacyFields" style="display:none;">
+                <div class="form-group">
+                  <label class="form-label"><i class="fa-solid fa-certificate"></i> Drug License No. (DL No.)</label>
+                  <input type="text" id="regLicense" class="form-input" placeholder="DL-2026-AP1234">
+                </div>
+
+                <!-- Pharmacy GPS Location Pinning -->
+                <div class="form-group"
+                  style="background: rgba(14, 165, 233, 0.07); border: 1px dashed rgba(14, 165, 233, 0.4); border-radius: 8px; padding: 12px; margin-top: 6px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="form-label" style="margin: 0; font-weight: 700; color: #0284c7;">
+                      <i class="fa-solid fa-map-location-dot"></i> Store GPS Location Pin
+                    </label>
+                    <span
+                      style="background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px;">Map
+                      Visible</span>
+                  </div>
+                  <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">
+                    Your store will be visible to Patients & Admins on the live medicine map and nearby medical stores
+                    directory.
+                  </p>
+
+                  <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <button type="button" class="btn-secondary" onclick="detectStoreLocation()"
+                      style="font-size: 12px; padding: 6px 12px; flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                      <i class="fa-solid fa-crosshairs" style="color:#0284c7;"></i> Detect Current GPS
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="setDemoStoreLocationPalghar()"
+                      style="font-size: 12px; padding: 6px 12px; flex: 1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                      <i class="fa-solid fa-city" style="color:#10b981;"></i> Palghar Demo
+                    </button>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                      <label style="font-size: 11px; color: #64748b; font-weight:600;">Latitude</label>
+                      <input type="number" step="0.00001" id="regLat" class="form-input" placeholder="19.6967"
+                        style="font-size: 12px; padding: 6px 10px;">
+                    </div>
+                    <div>
+                      <label style="font-size: 11px; color: #64748b; font-weight:600;">Longitude</label>
+                      <input type="number" step="0.00001" id="regLng" class="form-input" placeholder="72.7699"
+                        style="font-size: 12px; padding: 6px 10px;">
+                    </div>
+                  </div>
+                  <div id="storeLocationStatus"
+                    style="font-size: 11px; color: #0284c7; margin-top: 6px; font-weight: 600;">
+                    📍 Selected: Palghar, Maharashtra (Demo Area)
+                  </div>
+                </div>
+              </div>
+              <button type="submit" class="btn-primary" id="regStep1Btn">
+                <i class="fa-solid fa-shield-halved"></i> Continue to OTP Verification
+              </button>
+            </form>
+          </div>
+
+          <!-- Step 2: OTP Verification for Registration -->
+          <div id="regStep2" style="display:none;">
+            <div class="otp-box">
+              <div class="shield-icon"><i class="fa-solid fa-envelope-circle-check"></i></div>
+              <h4>Verify Registration OTP</h4>
+              <p>A secure 6-digit verification code has been dispatched to:<br>
+                <span class="otp-email" id="regOtpTargetEmail">you@gmail.com</span><br>
+                <span style="color:#38bdf8; font-size:12px; font-weight:600;" id="regOtpTargetPhone"></span>
+              </p>
+              <div class="otp-alert" id="regOtpAlert" style="display:none;"></div>
             </div>
-            <button type="submit" class="btn-primary" id="regBtn">
-              <i class="fa-solid fa-user-plus"></i> Create Account
+
+            <div class="form-group" style="text-align:center;">
+              <input type="text" id="regOtpInput" class="form-input otp-input-large" placeholder="------" maxlength="6"
+                autocomplete="one-time-code">
+            </div>
+
+            <button type="button" class="btn-primary" id="verifyRegOtpBtn" onclick="handleRegStep2()">
+              <i class="fa-solid fa-user-check"></i> Verify OTP & Complete Registration
             </button>
-          </form>
+
+            <div style="display:flex; justify-content:space-between; margin-top:14px;">
+              <button type="button" class="btn-secondary" onclick="backToRegStep1()">
+                <i class="fa-solid fa-arrow-left"></i> Edit Details
+              </button>
+              <button type="button" class="btn-secondary" onclick="resendRegOtp()" id="regResendBtn">
+                <i class="fa-solid fa-rotate"></i> Resend OTP
+              </button>
+            </div>
+          </div>
+
         </div>
 
       </div>

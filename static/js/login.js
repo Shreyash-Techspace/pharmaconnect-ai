@@ -52,6 +52,12 @@ function switchLoginTab(tab) {
   const isLogin = tab === 'login';
   document.getElementById('loginSection').style.display    = isLogin ? 'block' : 'none';
   document.getElementById('registerSection').style.display = isLogin ? 'none'  : 'block';
+  if (!isLogin) {
+    const s1 = document.getElementById('regStep1');
+    const s2 = document.getElementById('regStep2');
+    if (s1) s1.style.display = 'block';
+    if (s2) s2.style.display = 'none';
+  }
   document.getElementById('tabLogin').classList.toggle('active',    isLogin);
   document.getElementById('tabRegister').classList.toggle('active', !isLogin);
   document.getElementById('authTitle').innerText    = isLogin ? 'Welcome Back' : 'Create Account';
@@ -253,14 +259,23 @@ async function handleLoginStep1(e) {
         alertBox.innerHTML = `🔒 Demo OTP: <strong>${data.otp_demo}</strong>`;
         document.getElementById('otpInput').value = data.otp_demo;
         loginToast('Demo Login', 'OTP auto-filled for demo account.', 'info');
-      } else {
-        // Real account: backend already sent OTP to Gmail
-        alertBox.style.display = 'none';
+      } else if (data.sent_via_email) {
+        // Real account: backend sent OTP to Gmail
+        alertBox.style.display = 'inline-block';
+        alertBox.innerHTML = `✉️ Real OTP dispatched to <strong>${email}</strong>` + (data.phone ? ` & SMS to <strong>${data.phone}</strong>` : '') + `<br><small style="color:#94a3b8;">Check your Gmail inbox and phone messages.</small>`;
         loginToast(
           '📧 OTP Sent to Gmail',
-          `A 6-digit code was sent to ${email}. Check your inbox (and spam folder).`,
+          `A 6-digit code was sent to ${email}. Check your inbox.`,
           'success'
         );
+      } else {
+        // Real account where Gmail SMTP is not configured on server yet
+        alertBox.style.display = 'inline-block';
+        alertBox.innerHTML = `🔒 Real-Time Security OTP: <strong>${data.otp_code || data.otp_demo}</strong>` + (data.phone ? `<br><small style="color:#38bdf8;">📱 Mobile SMS dispatched to: ${data.phone}</small>` : '') + `<br><small style="color:#94a3b8;">(Gmail SMTP unconfigured on server; use code above)</small>`;
+        if (data.otp_code || data.otp_demo) {
+          document.getElementById('otpInput').value = data.otp_code || data.otp_demo;
+        }
+        loginToast('Security OTP Ready', 'Enter code above to verify.', 'info');
       }
 
     } else if (data.status === 'SUCCESS') {
@@ -330,8 +345,16 @@ async function resendOtp() {
       document.getElementById('otpDemoAlert').innerHTML = `🔒 New Demo OTP: <strong>${data.otp_demo}</strong>`;
       document.getElementById('otpInput').value = data.otp_demo;
       loginToast('OTP Resent', 'New demo OTP auto-filled.', 'info');
+    } else if (data.sent_via_email) {
+      document.getElementById('otpDemoAlert').innerHTML = `✉️ New code sent to <strong>${_pendingEmail}</strong>. Check your Gmail inbox.`;
+      loginToast('📧 OTP Resent', `New code sent to ${_pendingEmail}.`, 'success');
     } else {
-      loginToast('📧 OTP Resent', `New code sent to ${_pendingEmail}. Check your Gmail inbox.`, 'success');
+      document.getElementById('otpDemoAlert').style.display = 'inline-block';
+      document.getElementById('otpDemoAlert').innerHTML = `🔒 New Security OTP: <strong>${data.otp_code || data.otp_demo}</strong>`;
+      if (data.otp_code || data.otp_demo) {
+        document.getElementById('otpInput').value = data.otp_code || data.otp_demo;
+      }
+      loginToast('New Code Generated', 'Use code above to verify.', 'info');
     }
   } catch {
     loginToast('Error', 'Could not resend OTP. Is the server running?', 'error');
@@ -391,33 +414,119 @@ function completeLogin(data) {
   setTimeout(() => { window.location.href = '/'; }, 500);
 }
 
-// ── Register ─────────────────────────────────────────────────────────────────
-async function handleRegister(e) {
-  e.preventDefault();
-  const btn  = document.getElementById('regBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner"></i> Creating Account...';
+// ── Register: 2-Step OTP Workflow ───────────────────────────────────────────
+let _pendingRegData = null;
 
+async function handleRegStep1(e) {
+  e.preventDefault();
+  const btn = document.getElementById('regStep1Btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner"></i> Sending Verification OTP...';
+
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const phone = document.getElementById('regPhone').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const role = document.getElementById('regRole').value;
+  const address = document.getElementById('regAddress').value.trim();
+  const license = document.getElementById('regLicense') ? document.getElementById('regLicense').value.trim() : '';
   const latVal = document.getElementById('regLat') ? parseFloat(document.getElementById('regLat').value) : null;
   const lngVal = document.getElementById('regLng') ? parseFloat(document.getElementById('regLng').value) : null;
 
-  const payload = {
-    name:     document.getElementById('regName').value.trim(),
-    email:    document.getElementById('regEmail').value.trim(),
-    phone:    document.getElementById('regPhone').value.trim(),
-    password: document.getElementById('regPassword').value,
-    role:     document.getElementById('regRole').value,
-    address:  document.getElementById('regAddress').value.trim(),
-    license:  document.getElementById('regLicense') ? document.getElementById('regLicense').value : '',
-    avatar:   'patient_avatar.png',
+  if (!email || !email.includes('@')) {
+    loginToast('Invalid Email', 'Please enter a valid email address.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Continue to OTP Verification';
+    return;
+  }
+
+  if (!phone || phone.length < 10) {
+    loginToast('Invalid Phone', 'Please enter a valid mobile number with country code.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Continue to OTP Verification';
+    return;
+  }
+
+  if (!password || password.length < 6) {
+    loginToast('Weak Password', 'Password must be at least 6 characters long.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Continue to OTP Verification';
+    return;
+  }
+
+  _pendingRegData = {
+    name, email, phone, password, role, address, license,
+    avatar: 'patient_avatar.png',
     security_question: '',
-    security_answer:   '',
-    lat:      !isNaN(latVal) ? latVal : null,
-    lng:      !isNaN(lngVal) ? lngVal : null
+    security_answer: '',
+    lat: !isNaN(latVal) ? latVal : null,
+    lng: !isNaN(lngVal) ? lngVal : null
   };
 
   try {
-    const res  = await fetch('/api/auth/register', {
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        purpose: 'register',
+        name,
+        phone
+      })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      loginToast('Registration Error', data.detail || 'Could not send verification OTP.', 'error');
+      return;
+    }
+
+    // Transition to Step 2
+    document.getElementById('regStep1').style.display = 'none';
+    document.getElementById('regStep2').style.display = 'block';
+    document.getElementById('regOtpTargetEmail').innerText = email;
+    document.getElementById('regOtpTargetPhone').innerText = `📱 Mobile SMS: ${phone}`;
+
+    const regAlert = document.getElementById('regOtpAlert');
+    if (data.sent_via_email) {
+      regAlert.style.display = 'inline-block';
+      regAlert.innerHTML = `✉️ Real OTP dispatched to <strong>${email}</strong> & SMS to <strong>${phone}</strong>.<br><small style="color:#94a3b8;">Check your Gmail inbox and phone messages.</small>`;
+      loginToast('✅ OTP Dispatched', `Code sent to ${email} & ${phone}.`, 'success');
+    } else {
+      regAlert.style.display = 'inline-block';
+      regAlert.innerHTML = `🔒 Real-Time Verification OTP: <strong>${data.otp_code || data.otp_demo}</strong><br><small style="color:#38bdf8;">📱 Mobile SMS dispatched to: ${phone}</small><br><small style="color:#94a3b8;">(Live Gmail SMTP unconfigured on server; use code above)</small>`;
+      if (data.otp_code || data.otp_demo) {
+        document.getElementById('regOtpInput').value = data.otp_code || data.otp_demo;
+      }
+      loginToast('Security OTP Ready', 'Enter verification code to complete registration.', 'info');
+    }
+    document.getElementById('regOtpInput').focus();
+  } catch (err) {
+    loginToast('Connection Error', 'Cannot reach server. Make sure it is running.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Continue to OTP Verification';
+  }
+}
+
+async function handleRegStep2() {
+  const otpCode = document.getElementById('regOtpInput').value.trim();
+  if (!otpCode || otpCode.length !== 6) {
+    loginToast('Invalid Code', 'Please enter the 6-digit verification code.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('verifyRegOtpBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner"></i> Verifying & Creating Account...';
+
+  const payload = {
+    ..._pendingRegData,
+    otp_code: otpCode
+  };
+
+  try {
+    const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -427,13 +536,56 @@ async function handleRegister(e) {
     if (res.ok && data.status === 'SUCCESS') {
       completeLogin(data);
     } else {
-      loginToast('Registration Failed', data.detail || 'Please try again.', 'error');
+      loginToast('Verification Failed', data.detail || 'Wrong or expired OTP.', 'error');
     }
   } catch (err) {
-    loginToast('Error', 'Network error. Is the server running?', 'error');
+    loginToast('Error', 'Registration failed. Try again.', 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account';
+    btn.innerHTML = '<i class="fa-solid fa-user-check"></i> Verify OTP & Complete Registration';
+  }
+}
+
+function backToRegStep1() {
+  document.getElementById('regStep1').style.display = 'block';
+  document.getElementById('regStep2').style.display = 'none';
+}
+
+async function resendRegOtp() {
+  if (!_pendingRegData) return;
+  const btn = document.getElementById('regResendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner"></i> Resending...';
+  try {
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: _pendingRegData.email,
+        purpose: 'register',
+        name: _pendingRegData.name,
+        phone: _pendingRegData.phone
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const regAlert = document.getElementById('regOtpAlert');
+      if (data.sent_via_email) {
+        regAlert.innerHTML = `✉️ Real OTP resent to <strong>${_pendingRegData.email}</strong> & SMS to <strong>${_pendingRegData.phone}</strong>.`;
+        loginToast('OTP Resent', `New code sent to ${_pendingRegData.email}`, 'success');
+      } else {
+        regAlert.innerHTML = `🔒 New Security OTP: <strong>${data.otp_code || data.otp_demo}</strong>`;
+        if (data.otp_code || data.otp_demo) {
+          document.getElementById('regOtpInput').value = data.otp_code || data.otp_demo;
+        }
+        loginToast('New Code Generated', 'Use code above to verify.', 'info');
+      }
+    }
+  } catch {
+    loginToast('Error', 'Could not resend OTP.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Resend OTP';
   }
 }
 
