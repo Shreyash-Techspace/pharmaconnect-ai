@@ -211,20 +211,54 @@ function updateUserSessionUI() {
       if (storePhone) storePhone.innerText = currentPharmacyStore.phone || '+91 98201 12345';
     }
 
-    // Role-Based Access Control for Portal Switcher Buttons
+    // Role-Based Access Control for Portal Switcher Buttons (Desktop & Mobile)
+    const mNavPatient = document.getElementById('mobileNavPatientBtn');
+    const mNavPharmacy = document.getElementById('mobileNavPharmacyBtn');
+    const mNavAdmin = document.getElementById('mobileNavAdminBtn');
+
     if (currentUser.role === 'patient') {
       if (navPatient) navPatient.style.display = 'inline-flex';
       if (navPharmacy) navPharmacy.style.display = 'none';
       if (navAdmin) navAdmin.style.display = 'none';
+      if (mNavPatient) mNavPatient.style.display = 'flex';
+      if (mNavPharmacy) mNavPharmacy.style.display = 'none';
+      if (mNavAdmin) mNavAdmin.style.display = 'none';
     } else if (currentUser.role === 'pharmacy') {
       if (navPatient) navPatient.style.display = 'none';
       if (navPharmacy) navPharmacy.style.display = 'inline-flex';
       if (navAdmin) navAdmin.style.display = 'none';
+      if (mNavPatient) mNavPatient.style.display = 'none';
+      if (mNavPharmacy) mNavPharmacy.style.display = 'flex';
+      if (mNavAdmin) mNavAdmin.style.display = 'none';
     } else if (currentUser.role === 'admin') {
       // Admin has master access to inspect both Patient and Pharmacy portals safely
       if (navPatient) navPatient.style.display = 'inline-flex';
       if (navPharmacy) navPharmacy.style.display = 'inline-flex';
       if (navAdmin) navAdmin.style.display = 'inline-flex';
+      if (mNavPatient) mNavPatient.style.display = 'flex';
+      if (mNavPharmacy) mNavPharmacy.style.display = 'flex';
+      if (mNavAdmin) mNavAdmin.style.display = 'flex';
+    }
+
+    // Update Mobile Drawer User Card
+    const drawerAvatar = document.getElementById('mobileDrawerAvatar');
+    const drawerName = document.getElementById('mobileDrawerUserName');
+    const drawerRole = document.getElementById('mobileDrawerUserRole');
+    const drawerAuthArea = document.getElementById('mobileDrawerAuthArea');
+    if (drawerAvatar) drawerAvatar.innerText = currentUser.role === 'pharmacy' ? '🏥' : (currentUser.role === 'admin' ? '🛡️' : '👤');
+    if (drawerName) drawerName.innerText = currentUser.name;
+    if (drawerRole) drawerRole.innerText = `${currentUser.role.toUpperCase()} • ${currentUser.email || currentUser.phone || ''}`;
+    if (drawerAuthArea) {
+      drawerAuthArea.innerHTML = `
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" onclick="closeMobileDrawer(); openUserProfileModal();" style="flex:1; padding: 7px 10px; font-size: 12px; justify-content: center;">
+            <i class="fa-solid fa-gear"></i> Settings
+          </button>
+          <button class="btn" onclick="closeMobileDrawer(); logoutUser();" style="flex:1; padding: 7px 10px; font-size: 12px; justify-content: center; background: rgba(244,63,94,0.12); color: var(--rose-danger); border: 1px solid rgba(244,63,94,0.3);">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+          </button>
+        </div>
+      `;
     }
   } else {
     if (badge) badge.style.display = 'none';
@@ -242,6 +276,21 @@ function updateUserSessionUI() {
     if (navAdmin) {
       navAdmin.style.display = 'inline-flex';
       navAdmin.innerHTML = '<i class="fa-solid fa-lock" style="color:var(--amber-warning);"></i> <span>Admin Portal</span>';
+    }
+
+    const drawerAvatar = document.getElementById('mobileDrawerAvatar');
+    const drawerName = document.getElementById('mobileDrawerUserName');
+    const drawerRole = document.getElementById('mobileDrawerUserRole');
+    const drawerAuthArea = document.getElementById('mobileDrawerAuthArea');
+    if (drawerAvatar) drawerAvatar.innerText = '👤';
+    if (drawerName) drawerName.innerText = 'Guest User';
+    if (drawerRole) drawerRole.innerText = 'Not logged in';
+    if (drawerAuthArea) {
+      drawerAuthArea.innerHTML = `
+        <button class="btn btn-primary" onclick="closeMobileDrawer(); openAuthModal();" style="width:100%; padding: 8px 12px; font-size: 13px; justify-content: center;">
+          <i class="fa-solid fa-user"></i> Login / Register
+        </button>
+      `;
     }
   }
 }
@@ -265,15 +314,26 @@ function switchRole(role) {
 
   currentRole = role;
 
-  // Highlight active role button
+  // Highlight active role button across Desktop header and Mobile bottom nav
   const btnMap = { patient: 'navPatientBtn', pharmacy: 'navPharmacyBtn', admin: 'navAdminBtn' };
+  const mobileBtnMap = { patient: 'mobileNavPatientBtn', pharmacy: 'mobileNavPharmacyBtn', admin: 'mobileNavAdminBtn' };
+
   ['navPatientBtn', 'navPharmacyBtn', 'navAdminBtn'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.classList.remove('active');
   });
+  ['mobileNavPatientBtn', 'mobileNavPharmacyBtn', 'mobileNavAdminBtn'].forEach(id => {
+    const mBtn = document.getElementById(id);
+    if (mBtn) mBtn.classList.remove('active');
+  });
+
   if (btnMap[role]) {
     const activeBtn = document.getElementById(btnMap[role]);
     if (activeBtn) activeBtn.classList.add('active');
+  }
+  if (mobileBtnMap[role]) {
+    const activeMBtn = document.getElementById(mobileBtnMap[role]);
+    if (activeMBtn) activeMBtn.classList.add('active');
   }
 
   // Toggle views
@@ -1950,6 +2010,32 @@ function initGoogleMap() {
 }
 
 
+
+// ==========================================
+// MOBILE DRAWER CONTROLS
+// ==========================================
+function toggleMobileDrawer() {
+  const drawer = document.getElementById('mobileMenuDrawer');
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  if (drawer && overlay) {
+    const isOpen = drawer.classList.contains('active');
+    if (isOpen) {
+      closeMobileDrawer();
+    } else {
+      drawer.classList.add('active');
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+}
+
+function closeMobileDrawer() {
+  const drawer = document.getElementById('mobileMenuDrawer');
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  if (drawer) drawer.classList.remove('active');
+  if (overlay) overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
 
 // ==========================================
 // EMERGENCY DISPATCH MODAL

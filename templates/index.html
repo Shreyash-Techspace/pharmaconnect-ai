@@ -97,24 +97,24 @@
       <!-- Right Nav Controls -->
       <div class="nav-actions">
         <!-- Language Switcher -->
-        <select id="langSelect" onchange="changeLanguage(this.value)" class="icon-control-btn" style="width: auto; padding: 0 10px; font-weight: 600;">
+        <select id="langSelect" onchange="changeLanguage(this.value)" class="icon-control-btn" style="width: auto; padding: 0 8px; font-weight: 600;">
           <option value="en">🌐 EN</option>
           <option value="hi">🌐 हिंदी</option>
           <option value="mr">🌐 मराठी</option>
         </select>
 
-        <!-- Accessibility Mode Toggle -->
-        <button class="icon-control-btn" onclick="toggleAccessibility()" title="Toggle Elderly Accessibility Mode (Large Text)">
+        <!-- Accessibility Mode Toggle (Desktop only, available in mobile drawer) -->
+        <button class="icon-control-btn nav-desktop-only" onclick="toggleAccessibility()" title="Toggle Elderly Accessibility Mode (Large Text)">
           <i class="fa-solid fa-universal-access"></i>
         </button>
 
-        <!-- Rural SMS Mode Toggle -->
-        <button class="icon-control-btn" onclick="toggleRuralMode()" title="Toggle Rural Low-Bandwidth Mode">
+        <!-- Rural SMS Mode Toggle (Desktop only, available in mobile drawer) -->
+        <button class="icon-control-btn nav-desktop-only" onclick="toggleRuralMode()" title="Toggle Rural Low-Bandwidth Mode">
           <i class="fa-solid fa-tower-cell"></i>
         </button>
 
-        <!-- Intro Tour Trigger -->
-        <button class="icon-control-btn" onclick="openIntroSplash()" title="Play Platform Introduction & Animated Tour" style="color:var(--medical-blue);">
+        <!-- Intro Tour Trigger (Desktop only, available in mobile drawer) -->
+        <button class="icon-control-btn nav-desktop-only" onclick="openIntroSplash()" title="Play Platform Introduction & Animated Tour" style="color:var(--medical-blue);">
           <i class="fa-solid fa-wand-magic-sparkles"></i>
         </button>
 
@@ -122,7 +122,6 @@
         <button class="icon-control-btn" onclick="toggleTheme()" id="themeToggleBtn" title="Toggle Light/Dark Theme">
           <i class="fa-solid fa-moon"></i>
         </button>
-
 
         <!-- User Logged-in Session Badge -->
         <div class="user-session-badge" id="userSessionBadge" style="display: none; font-size: 13px; font-weight: 600; background: var(--bg-subtle); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-color); align-items: center; gap: 8px;">
@@ -140,6 +139,11 @@
         <!-- Login / Auth Modal Trigger -->
         <button class="btn btn-primary" id="authBtnTrigger" onclick="openAuthModal()" style="padding: 8px 16px; font-size: 14px;">
           <i class="fa-solid fa-user"></i> <span id="authBtnText">Login / Register</span>
+        </button>
+
+        <!-- Mobile Menu Toggle Button (Visible on <= 768px) -->
+        <button class="icon-control-btn mobile-menu-toggle-btn" onclick="toggleMobileDrawer()" title="Menu" aria-label="Open Mobile Menu">
+          <i class="fa-solid fa-bars"></i>
         </button>
       </div>
     </div>
@@ -1675,6 +1679,116 @@
       </div>
     </div>
   </div>
+
+  <!-- ========================================================================= -->
+  <!-- MOBILE BOTTOM APP NAVIGATION BAR (Active on Mobile Screens <= 768px)       -->
+  <!-- ========================================================================= -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
+    <button class="mobile-nav-item active" id="mobileNavPatientBtn" onclick="switchRole('patient')">
+      <i class="fa-solid fa-user-injured"></i>
+      <span>Patient</span>
+    </button>
+    <button class="mobile-nav-item" id="mobileNavPharmacyBtn" onclick="switchRole('pharmacy')">
+      <i class="fa-solid fa-clinic-medical"></i>
+      <span>Pharmacy</span>
+    </button>
+    <button class="mobile-nav-item mobile-nav-emergency" onclick="openEmergencyModal()" title="Instant Emergency SOS Dispatch">
+      <div class="emergency-fab-circle">
+        <i class="fa-solid fa-truck-medical"></i>
+      </div>
+      <span>SOS</span>
+    </button>
+    <button class="mobile-nav-item" id="mobileNavAdminBtn" onclick="switchRole('admin')">
+      <i class="fa-solid fa-user-shield"></i>
+      <span>Admin</span>
+    </button>
+    <button class="mobile-nav-item" onclick="toggleMobileDrawer()" title="More Options & Settings">
+      <i class="fa-solid fa-ellipsis"></i>
+      <span>More</span>
+    </button>
+  </nav>
+
+  <!-- ========================================================================= -->
+  <!-- MOBILE SLIDE-OVER DRAWER MENU & BACKDROP OVERLAY                          -->
+  <!-- ========================================================================= -->
+  <div class="mobile-drawer-overlay" id="mobileDrawerOverlay" onclick="closeMobileDrawer()"></div>
+  <aside class="mobile-menu-drawer" id="mobileMenuDrawer" aria-label="Mobile Menu Drawer">
+    <div class="mobile-drawer-header">
+      <div class="brand-logo" style="font-size: 17px;">
+        <div class="brand-icon-pulse" style="width: 30px; height: 30px; font-size: 15px;">
+          <i class="fa-solid fa-heart-pulse"></i>
+        </div>
+        <div><span>Pharma-Connect</span> <span style="color:var(--medical-blue);">AI</span></div>
+      </div>
+      <button class="icon-control-btn" onclick="closeMobileDrawer()" style="width: 32px; height: 32px;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- User Profile Card in Mobile Drawer -->
+    <div class="mobile-drawer-user-card" id="mobileDrawerUserCard">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-size: 26px;" id="mobileDrawerAvatar">👤</div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="mobileDrawerUserName">Guest User</div>
+          <div style="font-size: 11px; color: var(--text-secondary);" id="mobileDrawerUserRole">Not logged in</div>
+        </div>
+      </div>
+      <div style="margin-top: 10px;" id="mobileDrawerAuthArea">
+        <button class="btn btn-primary" onclick="closeMobileDrawer(); openAuthModal();" style="width:100%; padding: 8px 12px; font-size: 13px; justify-content: center;">
+          <i class="fa-solid fa-user"></i> Login / Register
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Healthcare Tools -->
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-heading">Healthcare Features</div>
+      <button class="mobile-drawer-row" onclick="closeMobileDrawer(); openEmergencyModal();" style="color: var(--rose-danger); font-weight: 700;">
+        <i class="fa-solid fa-truck-medical" style="color: var(--rose-danger);"></i>
+        <span>24/7 Emergency Dispatch</span>
+        <i class="fa-solid fa-chevron-right ml-auto"></i>
+      </button>
+      <button class="mobile-drawer-row" onclick="closeMobileDrawer(); triggerBarcodeUpload();">
+        <i class="fa-solid fa-barcode"></i>
+        <span>Scan Medicine Barcode</span>
+        <i class="fa-solid fa-chevron-right ml-auto"></i>
+      </button>
+      <button class="mobile-drawer-row" onclick="closeMobileDrawer(); scrollToSection('patientPrescriptionAnchor');">
+        <i class="fa-solid fa-file-prescription"></i>
+        <span>AI Prescription OCR</span>
+        <i class="fa-solid fa-chevron-right ml-auto"></i>
+      </button>
+      <button class="mobile-drawer-row" onclick="closeMobileDrawer(); scrollToSection('healthcareMapSection');">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>Hospitals & Pharmacies Map</span>
+        <i class="fa-solid fa-chevron-right ml-auto"></i>
+      </button>
+    </div>
+
+    <!-- Accessibility & Bandwidth Modes -->
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-heading">Modes & Settings</div>
+      <div class="mobile-drawer-toggle-row">
+        <span><i class="fa-solid fa-universal-access"></i> Elderly Mode</span>
+        <button class="btn btn-secondary" onclick="toggleAccessibility()" style="padding: 4px 10px; font-size: 11.5px;">Toggle</button>
+      </div>
+      <div class="mobile-drawer-toggle-row">
+        <span><i class="fa-solid fa-tower-cell"></i> Rural Low-Bandwidth</span>
+        <button class="btn btn-secondary" onclick="toggleRuralMode()" style="padding: 4px 10px; font-size: 11.5px;">Toggle</button>
+      </div>
+      <div class="mobile-drawer-toggle-row">
+        <span><i class="fa-solid fa-wand-magic-sparkles"></i> App Interactive Tour</span>
+        <button class="btn btn-secondary" onclick="closeMobileDrawer(); openIntroSplash();" style="padding: 4px 10px; font-size: 11.5px;">Start</button>
+      </div>
+    </div>
+
+    <!-- Emergency Hotline Footer -->
+    <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-color); text-align: center; font-size: 11.5px; color: var(--text-muted);">
+      <div>🚨 National Ambulance Hotline: <a href="tel:108" style="font-weight: 700; color: var(--rose-danger);">108</a> | <a href="tel:102" style="font-weight: 700; color: var(--rose-danger);">102</a></div>
+      <div style="margin-top: 4px;">PharmaConnect AI &copy; 2026. All rights reserved.</div>
+    </div>
+  </aside>
 
   <!-- Application Logic Scripts -->
   <script src="/static/js/app.js"></script>

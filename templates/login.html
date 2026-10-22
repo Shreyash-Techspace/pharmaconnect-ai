@@ -659,15 +659,39 @@
       font-weight: 600;
     }
 
-    /* ── Responsive ── */
+    /* ── Responsive Mobile Screen View ── */
     @media (max-width: 900px) {
+      body {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        height: auto !important;
+        min-height: 100vh;
+      }
+
+      .page-layout {
+        height: auto !important;
+        min-height: 100vh;
+        display: block;
+      }
+
       .brand-panel {
-        display: none;
+        display: none !important;
       }
 
       .auth-panel {
-        width: 100%;
+        width: 100% !important;
+        min-height: 100vh;
         border: none;
+        padding: 24px 16px !important;
+        display: flex;
+        align-items: flex-start !important;
+        justify-content: center;
+      }
+
+      .auth-card {
+        width: 100% !important;
+        max-width: 420px;
+        margin: 16px auto 32px;
       }
     }
 
