@@ -300,14 +300,18 @@ function switchRole(role) {
 
   if (!currentUser) {
     if (guardedRoles.includes(role)) {
-      alert(`🔒 Authentication Required: Please log in as an authorized ${role.toUpperCase()} to access this portal.`);
-      window.location.href = '/login';
+      if (confirm(`🔒 ${role.toUpperCase()} Portal requires an authorized account.\n\nWould you like to log in or register now?`)) {
+        openAuthModal();
+      }
       return;
     }
   } else {
     // Role Isolation Guard: Patient cannot access Pharmacy/Admin, Pharmacy cannot access Patient/Admin (Admin can access all)
     if (currentUser.role !== 'admin' && currentUser.role !== role) {
-      alert(`⚠️ Access Control: You are currently logged in as ${currentUser.name} (${currentUser.role.toUpperCase()}). Please log out first to switch to the ${role.toUpperCase()} portal.`);
+      if (confirm(`⚠️ Access Control: You are logged in as ${currentUser.name} (${currentUser.role.toUpperCase()}).\n\nTo access the ${role.toUpperCase()} portal, would you like to log in with an authorized account?`)) {
+        logoutUser();
+        setTimeout(() => openAuthModal(), 300);
+      }
       return;
     }
   }
@@ -340,6 +344,9 @@ function switchRole(role) {
   document.querySelectorAll('.view-module').forEach(mod => mod.style.display = 'none');
   const targetView = document.getElementById(`${role}View`);
   if (targetView) targetView.style.display = 'block';
+
+  // Smooth scroll to top when changing views
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 
   // Trigger role data loading
   if (role === 'patient') loadPatientOrders();
@@ -2022,8 +2029,11 @@ function toggleMobileDrawer() {
     if (isOpen) {
       closeMobileDrawer();
     } else {
-      drawer.classList.add('active');
-      overlay.classList.add('active');
+      overlay.style.display = 'block';
+      setTimeout(() => {
+        drawer.classList.add('active');
+        overlay.classList.add('active');
+      }, 10);
       document.body.style.overflow = 'hidden';
     }
   }
@@ -2033,7 +2043,12 @@ function closeMobileDrawer() {
   const drawer = document.getElementById('mobileMenuDrawer');
   const overlay = document.getElementById('mobileDrawerOverlay');
   if (drawer) drawer.classList.remove('active');
-  if (overlay) overlay.classList.remove('active');
+  if (overlay) {
+    overlay.classList.remove('active');
+    setTimeout(() => {
+      overlay.style.display = 'none';
+    }, 300);
+  }
   document.body.style.overflow = '';
 }
 

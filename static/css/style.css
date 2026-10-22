@@ -529,6 +529,7 @@ body.rural-mode-active .rural-mode-indicator {
 }
 
 /* Mobile Bottom Navigation Bar (Hidden on desktop) */
+/* Mobile Bottom Navigation Bar (Hidden on desktop) */
 .mobile-bottom-nav {
   display: none;
   position: fixed;
@@ -540,10 +541,12 @@ body.rural-mode-active .rural-mode-indicator {
   border-top: 1px solid var(--border-color);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  z-index: 1200;
+  z-index: 3000 !important;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   padding: 0 6px;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  pointer-events: auto !important;
+  touch-action: manipulation;
 }
 
 .mobile-nav-item {
@@ -558,11 +561,19 @@ body.rural-mode-active .rural-mode-indicator {
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 600;
-  padding: 6px 2px;
+  padding: 8px 2px;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
   text-decoration: none;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.mobile-nav-item * {
+  pointer-events: none;
 }
 
 .mobile-nav-item i {
@@ -585,11 +596,12 @@ body.rural-mode-active .rural-mode-indicator {
   position: relative;
   top: -14px;
   color: var(--rose-danger);
+  pointer-events: auto !important;
 }
 
 .emergency-fab-circle {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: linear-gradient(135deg, #f43f5e, #e11d48);
   color: white;
@@ -601,6 +613,7 @@ body.rural-mode-active .rural-mode-indicator {
   border: 3px solid var(--bg-secondary);
   animation: pulse-emergency 2s infinite;
   transition: transform 0.2s ease;
+  pointer-events: none;
 }
 
 .emergency-fab-circle:active {
@@ -615,18 +628,20 @@ body.rural-mode-active .rural-mode-indicator {
 
 /* Mobile Slide-Over Drawer Sheet */
 .mobile-drawer-overlay {
+  display: none;
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  z-index: 1998;
+  z-index: 3100;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
 }
 
 .mobile-drawer-overlay.active {
+  display: block !important;
   opacity: 1;
   pointer-events: auto;
 }
@@ -642,17 +657,21 @@ body.rural-mode-active .rural-mode-indicator {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-left: 1px solid var(--border-color);
-  z-index: 1999;
+  z-index: 3200;
   display: flex;
   flex-direction: column;
   padding: 20px 18px 84px;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.3);
   transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .mobile-menu-drawer.active {
   right: 0;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .mobile-drawer-header {

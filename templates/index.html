@@ -1684,25 +1684,25 @@
   <!-- MOBILE BOTTOM APP NAVIGATION BAR (Active on Mobile Screens <= 768px)       -->
   <!-- ========================================================================= -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
-    <button class="mobile-nav-item active" id="mobileNavPatientBtn" onclick="switchRole('patient')">
+    <button type="button" class="mobile-nav-item active" id="mobileNavPatientBtn" onclick="switchRole('patient')">
       <i class="fa-solid fa-user-injured"></i>
       <span>Patient</span>
     </button>
-    <button class="mobile-nav-item" id="mobileNavPharmacyBtn" onclick="switchRole('pharmacy')">
+    <button type="button" class="mobile-nav-item" id="mobileNavPharmacyBtn" onclick="switchRole('pharmacy')">
       <i class="fa-solid fa-clinic-medical"></i>
       <span>Pharmacy</span>
     </button>
-    <button class="mobile-nav-item mobile-nav-emergency" onclick="openEmergencyModal()" title="Instant Emergency SOS Dispatch">
+    <button type="button" class="mobile-nav-item mobile-nav-emergency" id="mobileNavEmergencyBtn" onclick="openEmergencyModal()" title="Instant Emergency SOS Dispatch">
       <div class="emergency-fab-circle">
         <i class="fa-solid fa-truck-medical"></i>
       </div>
       <span>SOS</span>
     </button>
-    <button class="mobile-nav-item" id="mobileNavAdminBtn" onclick="switchRole('admin')">
+    <button type="button" class="mobile-nav-item" id="mobileNavAdminBtn" onclick="switchRole('admin')">
       <i class="fa-solid fa-user-shield"></i>
       <span>Admin</span>
     </button>
-    <button class="mobile-nav-item" onclick="toggleMobileDrawer()" title="More Options & Settings">
+    <button type="button" class="mobile-nav-item" id="mobileNavMoreBtn" onclick="toggleMobileDrawer()" title="More Options & Settings">
       <i class="fa-solid fa-ellipsis"></i>
       <span>More</span>
     </button>
@@ -1791,7 +1791,7 @@
   </aside>
 
   <!-- Application Logic Scripts -->
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=20261022_02"></script>
 </body>
 </html>
 
