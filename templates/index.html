@@ -1609,13 +1609,25 @@
 
       <div class="chatbot-messages" id="chatbotMessages">
         <div class="chat-msg bot">
-          👋 Hi! I am <strong>PharmaBot AI</strong>. How can I help you today? You can ask about medicine uses, symptoms, dosage, or emergency help!
+          👋 Hi! I am <strong>PharmaBot AI Assistant</strong>. Ask me anything about medicines, dosages, side effects, generic substitutes, or emergency first aid!
         </div>
       </div>
 
+      <!-- Quick Suggestion Chips for Universal Medical & Emergency Questions -->
+      <div class="chatbot-quick-chips">
+        <button class="chatbot-chip emergency" onclick="quickChatQuestion('I have an emergency! What should I do?')">🚨 Emergency SOS</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('What medicine for fever and headache?')">🌡️ Fever & Headache</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('Best medicine for acidity and heartburn?')">🔥 Acidity Relief</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('How does chest pain or heart attack first aid work?')">🩺 Chest Pain / Heart</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('How to find Jan Aushadhi generic substitutes?')">💊 Generic Substitutes</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('Medicine for allergic cough and cold?')">🤧 Cough & Cold</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('What to do for low blood sugar hypoglycemia?')">🩸 Low Sugar Crash</button>
+        <button class="chatbot-chip" onclick="quickChatQuestion('First aid for burns and scalds?')">🩹 Burns First Aid</button>
+      </div>
+
       <div class="chatbot-input-area">
-        <input type="text" id="chatbotInput" placeholder="Ask about symptoms or medicines..." onkeyup="if(event.key==='Enter') sendChatMessage()">
-        <button onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+        <input type="text" id="chatbotInput" placeholder="Ask about symptoms, medicines, or emergencies..." onkeyup="if(event.key==='Enter') sendChatMessage()">
+        <button onclick="sendChatMessage()" title="Send"><i class="fa-solid fa-paper-plane"></i></button>
       </div>
     </div>
   </div>
@@ -1764,6 +1776,11 @@
         <span>Hospitals & Pharmacies Map</span>
         <i class="fa-solid fa-chevron-right ml-auto"></i>
       </button>
+      <button class="mobile-drawer-row" onclick="closeMobileDrawer(); toggleAIChatbotWindow();" style="color: var(--purple-ai); font-weight: 700;">
+        <i class="fa-solid fa-robot" style="color: var(--purple-ai);"></i>
+        <span>PharmaBot AI Assistant</span>
+        <i class="fa-solid fa-chevron-right ml-auto"></i>
+      </button>
     </div>
 
     <!-- Accessibility & Bandwidth Modes -->
@@ -1791,7 +1808,7 @@
   </aside>
 
   <!-- Application Logic Scripts -->
-  <script src="/static/js/app.js?v=20261022_02"></script>
+  <script src="/static/js/app.js?v=20261022_03"></script>
 </body>
 </html>
 

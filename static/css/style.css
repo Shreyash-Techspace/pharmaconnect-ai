@@ -990,26 +990,51 @@ body.rural-mode-active .rural-mode-indicator {
     font-size: 13px;
   }
 
-  /* Floating Chatbot Widget positioned above bottom nav */
+  /* Floating Chatbot Widget positioned safely above bottom navigation bar */
   .chatbot-widget-container {
-    bottom: 74px;
-    left: auto;
-    right: 14px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+    left: auto !important;
+    right: 16px !important;
+    z-index: 3100 !important;
   }
   .chatbot-toggle-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 20px;
+    width: 50px;
+    height: 50px;
+    font-size: 21px;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);
   }
   .chatbot-window {
     position: fixed !important;
     left: 10px !important;
     right: 10px !important;
-    bottom: 76px !important;
+    bottom: 80px !important;
     width: auto !important;
     max-width: calc(100vw - 20px) !important;
     height: calc(100vh - 160px) !important;
     max-height: 520px !important;
+    z-index: 3200 !important;
+  }
+}
+
+/* ── Mobile Landscape Orientation & Short Screens (<= 550px height) ── */
+@media (max-height: 550px) {
+  .chatbot-widget-container {
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+    right: 14px !important;
+    left: auto !important;
+    z-index: 3100 !important;
+  }
+  .chatbot-toggle-btn {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 18px !important;
+  }
+  .chatbot-window {
+    position: fixed !important;
+    bottom: 70px !important;
+    height: calc(100vh - 82px) !important;
+    max-height: 86vh !important;
+    z-index: 3200 !important;
   }
 
   /* Modals on Mobile */

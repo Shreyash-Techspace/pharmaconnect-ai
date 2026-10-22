@@ -1085,38 +1085,410 @@ class ChatRequest(BaseModel):
     message: str
     user_role: Optional[str] = "patient"
 
-@app.post("/api/ai/chatbot")
-async def ai_chatbot_response(req: ChatRequest):
-    """Interactive AI Healthcare Assistant Chatbot"""
-    msg = req.message.lower().strip()
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIVERSAL CLINICAL AI CHATBOT ENGINE
+# ─────────────────────────────────────────────────────────────────────────────
 
-    conn = db.get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM medicines")
-    meds = [dict(r) for r in c.fetchall()]
-    conn.close()
+def get_universal_medical_ai_reply(msg: str, user_role: str, meds: list) -> dict:
+    """Universal Clinical AI Chatbot Engine for Medicine, Health, and Emergency protocols."""
+    m = msg.lower().strip()
+    action = None
+    quick_replies = []
 
-    # Rule & Knowledge Matching
-    matched_meds = [m for m in meds if m["name"].lower() in msg or m["generic_name"].lower() in msg or any(s.strip().lower() in msg for s in m["symptoms"].split(","))]
+    # ═════════════════════════════════════════════════════════════════════════
+    # 1. CRITICAL MEDICAL EMERGENCIES (Life-Saving Protocols)
+    # ═════════════════════════════════════════════════════════════════════════
 
-    if "fever" in msg or "headache" in msg or "pain" in msg:
-        reply = "🌡️ **Fever & Pain Relief Guidance:**\nFor mild to moderate fever and body ache, **Dolo 650** (Paracetamol 650mg) is commonly used. Recommended dosage: 1 tablet after food every 6 hours. Stay hydrated!\n\nWould you like to check nearby pharmacy stock or add Dolo 650 to your cart?"
-    elif "acidity" in msg or "gas" in msg or "heartburn" in msg:
-        reply = "🔥 **Acidity & Heartburn Relief Guidance:**\n**Pantoprazole 40mg** helps reduce stomach acid. Take 1 tablet early morning on an empty stomach. Avoid spicy foods and lying down immediately after meals."
-    elif "cough" in msg or "cold" in msg or "allergy" in msg:
-        reply = "🤧 **Allergy & Respiratory Relief:**\n**Montair LC** (Montelukast + Levocetirizine) helps relieve runny nose, sneezing, and allergic cough. Dosage: 1 tablet at bedtime."
-    elif "emergency" in msg or "urgent" in msg or "help" in msg:
-        reply = "🚨 **Emergency Assistance:**\nIf you need critical medicines urgently, click the **'Need Medicine Urgently'** button on top. We will dispatch an emergency rider to the nearest 24/7 open pharmacy immediately!"
-    elif matched_meds:
-        m = matched_meds[0]
-        reply = f"💊 **{m['name']} ({m['generic_name']}):**\n• Category: {m['category']}\n• Standard Dosage: {m['dosage']}\n• Symptoms Used For: {m['symptoms']}\n• Price: ₹ {m['mrp']:.2f}\n• Rx Required: {'Yes' if m['prescription_required'] else 'No'}"
+    # A. Cardiac / Chest Pain / Heart Attack
+    if any(k in m for k in ["chest pain", "heart attack", "angina", "cardiac", "chest pressure", "heart stroke", "left arm pain"]):
+        reply = (
+            "🚨 **URGENT CARDIAC EMERGENCY PROTOCOL:**\n"
+            "• **Immediate Action:** Call National Ambulance **108** or **102** immediately!\n"
+            "• **First Aid:**\n"
+            "  1. Have the patient sit upright in a comfortable position with back supported. Do NOT let them walk or exert.\n"
+            "  2. If not allergic, chew one **Aspirin 300mg** tablet (helps dissolve blood clots fast).\n"
+            "  3. If prescribed, place **Sorbitrate 5mg** under the tongue.\n"
+            "  4. Loosen tight collar, belt, and clothing. Ensure fresh ventilation.\n\n"
+            "⚠️ *Every minute counts! If you need emergency medicine or oxygen delivery dispatched to your location, click below:*"
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["🚨 Dispatch Emergency Meds", "📞 Call Ambulance 108", "What is Sorbitrate 5mg?"]
+
+    # B. Stroke (Brain Attack)
+    elif any(k in m for k in ["stroke", "brain stroke", "paralysis", "face drooping", "slurred speech", "weakness in arm", "fast protocol"]):
+        reply = (
+            "🚨 **EMERGENCY: ACUTE STROKE (F.A.S.T.) PROTOCOL:**\n"
+            "Remember the **F.A.S.T.** signs:\n"
+            "• **F - Face:** Ask them to smile. Does one side of the face droop?\n"
+            "• **A - Arms:** Ask them to raise both arms. Does one arm drift downward?\n"
+            "• **S - Speech:** Ask them to repeat a simple sentence. Is their speech slurred or strange?\n"
+            "• **T - Time:** Call **108** IMMEDIATELY! The golden window is **3 to 4.5 hours** for clot-dissolving therapy.\n\n"
+            "⚠️ **CRITICAL DO NOTs:**\n"
+            "• DO NOT give food, water, or medicine (swallowing muscles may be paralyzed, causing choking).\n"
+            "• Keep patient lying on their side with head slightly elevated."
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["🚨 Call 108", "Hospital ICU Map", "Emergency Rider Dispatch"]
+
+    # C. Severe Asthma Attack / Breathlessness
+    elif any(k in m for k in ["asthma attack", "severe breathlessness", "cant breathe", "cannot breathe", "gasping", "wheezing badly"]):
+        reply = (
+            "🫁 **ACUTE ASTHMA / BREATHLESSNESS PROTOCOL:**\n"
+            "• **Immediate Action:** Sit the patient upright and lean them slightly forward. Do NOT lie flat.\n"
+            "• **Reliever Inhaler:** Take 2 to 4 puffs of **Salbutamol / Asthalin (100mcg)** inhaler immediately, preferably using a spacer. Wait 2 minutes; repeat if necessary (up to 10 puffs in an emergency).\n"
+            "• Loosen tight clothing around neck and chest.\n"
+            "• **Danger Signs:** If lips turn bluish (cyanosis), person cannot speak full words, or no inhaler is available, call **108** immediately."
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["Search Asthalin Inhaler", "🚨 Emergency SOS", "Nearby 24/7 Pharmacies"]
+
+    # D. Severe Allergic Reaction / Anaphylaxis
+    elif any(k in m for k in ["anaphylaxis", "allergic shock", "severe allergy", "throat swelling", "epipen", "tongue swollen"]):
+        reply = (
+            "🚨 **ANAPHYLAXIS (SEVERE ALLERGIC REACTION) PROTOCOL:**\n"
+            "• **Action:** If available, administer an **EpiPen / Adrenaline (0.3mg)** auto-injector into the outer mid-thigh muscle immediately.\n"
+            "• Keep patient lying down with legs elevated (unless breathing is difficult, then sit up).\n"
+            "• Secondary medication: Oral **Avil (Pheniramine)** or **Cetirizine 10mg** once stable.\n"
+            "• Rush to the nearest Emergency Room immediately — anaphylaxis can recur after initial improvement!"
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["🚨 Need Medicine Urgently", "Hospital Emergency Map"]
+
+    # E. Seizures / Fits / Epilepsy
+    elif any(k in m for k in ["seizure", "convulsion", "fits", "epilepsy", "shaking uncontrollably"]):
+        reply = (
+            "⚡ **SEIZURE & FITS FIRST AID PROTOCOL:**\n"
+            "1. **Safety First:** Clear the surrounding area of sharp or hard objects. Place a soft cushion or jacket under their head.\n"
+            "2. **Recovery Position:** Gently roll the person onto their side (recovery position) to prevent tongue from blocking airway and allow saliva/vomit to drain.\n"
+            "3. **CRITICAL WARNINGS:**\n"
+            "   • **NEVER** put anything inside their mouth (no spoons, keys, fingers, or water)!\n"
+            "   • **NEVER** hold them down or restrain their jerky movements.\n"
+            "4. Time the seizure. If it lasts **more than 5 minutes**, or if a second seizure starts, call **108** immediately."
+        )
+        quick_replies = ["Call Ambulance 108", "What causes seizures?", "Epilepsy medicines"]
+
+    # F. Severe Bleeding / Hemorrhage
+    elif any(k in m for k in ["bleeding heavily", "severe bleeding", "blood not stopping", "deep wound", "arterial bleed"]):
+        reply = (
+            "🩸 **SEVERE BLEEDING FIRST AID:**\n"
+            "• **Direct Pressure:** Press firmly on the wound using a clean cloth, sterile gauze, or your hand. Maintain uninterrupted pressure for at least 10–15 minutes.\n"
+            "• **Elevation:** If possible, elevate the bleeding limb above the level of the heart to slow blood flow.\n"
+            "• If blood soaks through, do NOT remove the original cloth; place another clean cloth directly on top and continue pressing.\n"
+            "• For spurting bright red arterial blood from limbs, apply a tourniquet 2–3 inches above the wound and call **108** immediately."
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["🚨 Emergency Rider Dispatch", "Call Ambulance 108"]
+
+    # G. Diabetic Hypoglycemia (Sugar Crash)
+    elif any(k in m for k in ["low sugar", "hypoglycemia", "sugar crash", "sugar dropped", "shivering sugar"]):
+        reply = (
+            "🩸 **HYPOGLYCEMIA (LOW BLOOD SUGAR < 70 mg/dL):**\n"
+            "Follow the **15-15 Rule:**\n"
+            "1. Consume **15 to 20 grams of fast-acting carbohydrate** immediately:\n"
+            "   • 3 teaspoons of sugar or glucose powder dissolved in water\n"
+            "   • 1/2 cup (120 ml) of fruit juice or regular (non-diet) soda\n"
+            "   • 1 tablespoon of honey or 4 glucose sweets\n"
+            "2. Rest for **15 minutes**, then recheck blood sugar level.\n"
+            "3. If still below 70 mg/dL, take another 15g of sugar.\n"
+            "⚠️ **Unconscious Patient:** NEVER force liquids into an unconscious person's mouth (risk of choking). Call **108** immediately for IV Dextrose or Glucagon injection."
+        )
+        quick_replies = ["Diabetes care guide", "Metformin 500mg info", "Insulin storage tips"]
+
+    # H. Burns & Scalds
+    elif any(k in m for k in ["burn", "burns", "scald", "hot oil", "fire burn"]):
+        reply = (
+            "🔥 **BURNS & SCALDS FIRST AID PROTOCOL:**\n"
+            "1. **Cool Water:** Immediately hold the burn under gently running cool tap water for **15 to 20 minutes**. This stops heat damage deep in skin tissues.\n"
+            "2. **DO NOT APPLY:** Never apply ice, ice water, toothpaste, butter, turmeric, or oil. These trap heat and cause tissue necrosis or severe infection.\n"
+            "3. **Topical Care:** Apply **Silver Sulfadiazine (Burnol / Megaderm)** ointment gently. Cover loosely with sterile non-stick dressing.\n"
+            "4. **Medical Care:** For burns larger than a palm, facial burns, chemical burns, or blistering, visit a hospital ER immediately."
+        )
+        quick_replies = ["Search Silver Sulfadiazine", "First Aid Kit Essentials"]
+
+    # I. Snakebite & Animal Bites
+    elif any(k in m for k in ["snake bite", "snakebite", "dog bite", "cat bite", "rabies"]):
+        if "snake" in m:
+            reply = (
+                "🐍 **SNAKEBITE EMERGENCY FIRST AID:**\n"
+                "• **Immediate Action:** Keep the patient calm and completely still. Movement spreads venom rapidly through the lymphatic system.\n"
+                "• **Immobilize:** Splint the bitten limb and keep it at or slightly below heart level.\n"
+                "• **DANGEROUS MYTHS TO AVOID:**\n"
+                "  ❌ Do NOT cut the wound or try to suck venom out.\n"
+                "  ❌ Do NOT apply ice or tight tourniquets (causes limb loss).\n"
+                "• **Rush to Hospital:** Transport patient immediately to the nearest hospital with Anti-Snake Venom (ASV). Call **108**."
+            )
+        else:
+            reply = (
+                "🐕 **DOG / ANIMAL BITE (RABIES PREVENTION PROTOCOL):**\n"
+                "1. **Wash Thoroughly:** Wash the bite wound immediately under running tap water with laundry/toilet soap for a full **15 minutes**. This neutralizes over 90% of rabies virus.\n"
+                "2. Apply **Povidone Iodine (Betadine)** antiseptic. Do NOT bandage or stitch the wound.\n"
+                "3. **Visit Hospital Immediately:** Administer Anti-Rabies Vaccine (ARV) on **Day 0, 3, 7, 14, 28** + Tetanus Toxoid. For deep bites, Rabies Immunoglobulin (RIG) is mandatory!"
+            )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["Hospital ICU Map", "🚨 Call 108 Emergency"]
+
+    # J. Poisoning / Chemical Ingestion
+    elif any(k in m for k in ["poison", "poisoning", "swallowed chemical", "swallowed detergent", "ingested pesticide"]):
+        reply = (
+            "☣️ **POISONING & CHEMICAL INGESTION FIRST AID:**\n"
+            "• **DO NOT INDUCE VOMITING:** Inducing vomiting with acids, alkalis, detergents, or kerosene burns the esophagus a second time.\n"
+            "• Keep the chemical/medicine container or packet with you to show the doctors.\n"
+            "• If poison is on skin/eyes: Flush with copious clean water for 15 minutes.\n"
+            "• **National Poison Information Centre (AIIMS New Delhi):** Toll-Free **1800-116-117** or **011-26589391**.\n"
+            "• Call **108** and rush to the nearest casualty center immediately!"
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["🚨 Call 108", "Emergency Hospital Map"]
+
+    # K. Generic Emergency Dispatch Request
+    elif any(k in m for k in ["emergency", "urgent medicine", "need medicine now", "sos", "urgent delivery", "dispatch rider"]):
+        reply = (
+            "🚨 **24/7 EMERGENCY MEDICINE DISPATCH SERVICE:**\n"
+            "PharmaConnect AI operates real-time emergency dispatch for critical medicines, ICU injections, inhalers, and cardiac drugs.\n\n"
+            "Click **'Dispatch Emergency Medicine'** below to auto-locate open 24/7 pharmacies within 5km and assign an emergency delivery rider immediately!"
+        )
+        action = "OPEN_EMERGENCY_MODAL"
+        quick_replies = ["🚨 Open Emergency Modal", "Call Ambulance 108", "Nearest Open Medicals"]
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 2. COMMON ILLNESSES, MEDICINES & SYMPTOM GUIDANCE
+    # ═════════════════════════════════════════════════════════════════════════
+
+    # A. Fever & Body Pain
+    elif any(k in m for k in ["fever", "temperature", "headache", "body pain", "dolo", "calpol", "paracetamol"]):
+        reply = (
+            "🌡️ **FEVER & HEADACHE CLINICAL GUIDANCE:**\n"
+            "• **First-Line Medication:** **Dolo 650** or **Calpol 650** (Paracetamol 650mg).\n"
+            "• **Dosage:** 1 tablet after meals every 6–8 hours as needed. Maximum daily limit: 3,000 mg (never exceed 4 tablets in 24 hours to prevent liver toxicity).\n"
+            "• **Supportive Care:** Stay well-hydrated with water, coconut water, or ORS. Sponge with lukewarm tap water on forehead if temperature exceeds 102°F.\n"
+            "• **When to see a Doctor:** If fever lasts > 3 days, or accompanied by stiff neck, rash, or breathing difficulty."
+        )
+        quick_replies = ["Check Dolo 650 Stock", "Generic Paracetamol ₹12", "Fever in children"]
+
+    # B. Severe Muscle / Joint / Period Pain
+    elif any(k in m for k in ["period pain", "menstrual cramp", "stomach cramp", "back pain", "joint pain", "meftal spas", "combiflam"]):
+        if any(k in m for k in ["period", "menstrual", "cramp", "meftal"]):
+            reply = (
+                "🌸 **MENSTRUAL CRAMPS & SPASMS GUIDANCE:**\n"
+                "• **First-Line:** **Meftal-Spas** (Mefenamic Acid 250mg + Dicyclomine 10mg) relieves uterine smooth muscle spasms and prostaglandin pain.\n"
+                "• **Dosage:** 1 tablet strictly after food, up to 2-3 times daily for 1-2 days.\n"
+                "• **Non-Medication Relief:** Use a hot water bag on lower abdomen, gentle stretching, chamomile tea, and avoid excess caffeine.\n"
+                "• *Caution: Avoid taking on an empty stomach.*"
+            )
+        else:
+            reply = (
+                "💪 **BODY PAIN & MUSCLE INFLAMMATION:**\n"
+                "• **Medication:** **Combiflam** (Ibuprofen 400mg + Paracetamol 325mg) or **Voveran 50** (Diclofenac Sodium).\n"
+                "• **Usage:** Always take with or after meals to protect gastric lining.\n"
+                "• **Topical:** Apply Diclofenac gel (Volini / Voveran) 3 times daily.\n"
+                "• **Caution:** Avoid NSAIDs (Ibuprofen/Diclofenac) if you have stomach ulcers, kidney disease, or in late pregnancy."
+            )
+        quick_replies = ["Search Meftal Spas", "Search Combiflam", "Generic Alternatives"]
+
+    # C. Acidity, GERD, Gas & Indigestion
+    elif any(k in m for k in ["acidity", "gas", "gerd", "heartburn", "acid reflux", "bloating", "indigestion", "pan 40", "pantoprazole", "omeprazole"]):
+        reply = (
+            "🔥 **ACIDITY, HEARTBURN & GERD RELIEF:**\n"
+            "• **Proton Pump Inhibitor (PPI):** **Pantoprazole 40mg (Pan 40)** or **Omeprazole 20mg (Omez)**.\n"
+            "  *Dosage:* Take 1 tablet early morning on an EMPTY stomach, at least 30–45 minutes before tea, coffee, or breakfast.\n"
+            "• **Instant Relief Antacid:** **Gelusil / Digene** syrup or chewable tablets (neutralizes existing acid within 5 minutes).\n"
+            "• **Lifestyle Tips:** Avoid lying down for 2 hours after meals, reduce spicy/fried food, and elevate head of bed by 15 degrees."
+        )
+        quick_replies = ["Check Pan 40 Stock", "Digene Antacid Gel", "Jan Aushadhi Pantoprazole"]
+
+    # D. Cough (Dry vs Wet / Productive)
+    elif any(k in m for k in ["cough", "khansi", "phlegm", "dry cough", "wet cough", "sore throat", "throat pain"]):
+        reply = (
+            "😷 **COUGH & THROAT INFECTION CLINICAL GUIDANCE:**\n"
+            "1. **Dry / Allergic Cough (No mucus):**\n"
+            "   • **Syrup:** Dextromethorphan + Chlorpheniramine (e.g., **Alex Syrup**, **Benadryl DR**).\n"
+            "   • *Dosage:* 5–10 ml after food 2-3 times daily.\n"
+            "2. **Wet / Productive Cough (Chest congestion & phlegm):**\n"
+            "   • **Syrup:** Ambroxol + Guaifenesin + Terbutaline (e.g., **Ascoril LS**, **Grilinctus-BM**).\n"
+            "   • Helps thin and expel thick mucus. Drink plenty of warm water and take steam inhalation.\n"
+            "3. **Sore Throat:** Warm salt water gargles 3 times a day or Betadine 2% gargles."
+        )
+        quick_replies = ["Search Ascoril LS", "Search Alex Cough Syrup", "Strepsils & Lozenges"]
+
+    # E. Cold, Runny Nose, Sneezing & Allergies
+    elif any(k in m for k in ["cold", "sneezing", "runny nose", "allergy", "sinus", "cetirizine", "montair lc", "cetzine"]):
+        reply = (
+            "🤧 **ALLERGIC RHINITIS, COLD & SNEEZING:**\n"
+            "• **First-Line:** **Montair LC** (Montelukast 10mg + Levocetirizine 5mg) or **Cetzine** (Cetirizine 10mg).\n"
+            "• **Dosage:** 1 tablet once daily, preferably at bedtime (may cause mild drowsiness).\n"
+            "• **Nasal Congestion:** Use Saline Nasal Spray (Nasoclear) or Otrivin (Xylometazoline) for up to 3 days maximum (avoid prolonged use to prevent rebound congestion).\n"
+            "• Steam inhalation with Eucalyptus / Karvol Plus capsules twice daily."
+        )
+        quick_replies = ["Check Montair LC Stock", "Cetzine 10mg Price", "Saline Nasal Drops"]
+
+    # F. Diarrhea, Loose Motions, Vomiting & Hydration
+    elif any(k in m for k in ["diarrhea", "loose motion", "vomit", "vomiting", "nausea", "food poisoning", "ors", "electral"]):
+        reply = (
+            "💧 **DIARRHEA, LOOSE MOTIONS & VOMITING PROTOCOL:**\n"
+            "1. **Hydration (Priority #1):** **WHO-formula ORS (Electral)**.\n"
+            "   • Dissolve 1 full sachet (21.8g) in **1 liter of clean drinking water**.\n"
+            "   • Drink 1 cup after every loose bowel movement to prevent fatal electrolyte loss.\n"
+            "2. **For Nausea / Vomiting:** **Ondansetron 4mg (Emeset 4)** 30 minutes before meals.\n"
+            "3. **Gut Flora Recovery:** Probiotic capsule/sachet (**Sporlac / Darolac**) twice daily.\n"
+            "4. **Diet:** BRAT diet (Bananas, Rice, Apple sauce, Toast) with curd/buttermilk. Avoid milk, oily food, and caffeine."
+        )
+        quick_replies = ["Order Electral ORS", "Search Emeset 4mg", "Probiotics & Gut Care"]
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 3. CHRONIC CONDITIONS, MAINTENANCE MEDS & VITAMINS
+    # ═════════════════════════════════════════════════════════════════════════
+
+    # A. Diabetes & Insulin
+    elif any(k in m for k in ["diabetes", "sugar", "metformin", "glycomet", "insulin", "hba1c"]):
+        reply = (
+            "🩸 **DIABETES CARE & MEDICINE INSTRUCTIONS:**\n"
+            "• **Metformin (Glycomet 500/850/1000mg):** Take with or immediately after meals to reduce stomach upset.\n"
+            "• **Glimepiride (Amaryl):** Take 15 minutes before your first main meal (breakfast).\n"
+            "• **Insulin Pen Storage:**\n"
+            "  - Unopened vials/cartridges: Store in refrigerator at **2°C to 8°C** (never freeze).\n"
+            "  - In-use pen: Can be kept at room temperature (< 30°C) for up to **28 days**. Keep away from direct sunlight.\n"
+            "• **Target Blood Sugar:** Fasting < 100 mg/dL, Post-prandial (2 hrs after food) < 140 mg/dL. Check HbA1c every 3 months."
+        )
+        quick_replies = ["Check Metformin 500mg", "Hypoglycemia Emergency", "Jan Aushadhi Diabetes Meds"]
+
+    # B. Blood Pressure & Hypertension
+    elif any(k in m for k in ["blood pressure", "high bp", "hypertension", "telmisartan", "amlodipine", "telma"]):
+        reply = (
+            "🩺 **HYPERTENSION (HIGH BP) MAINTENANCE:**\n"
+            "• **Common Meds:** **Telmisartan 40mg (Telma 40)** or **Amlodipine 5mg (Stamlo)**.\n"
+            "• **Golden Rule:** **NEVER stop your blood pressure medication suddenly!** Abrupt cessation causes rebound hypertensive crises leading to strokes or heart attacks.\n"
+            "• Take your dose consistently at the same time every morning.\n"
+            "• **Dietary Advice:** Restrict daily sodium salt intake to under 1 teaspoon (< 5 grams). Exercise 30 minutes daily."
+        )
+        quick_replies = ["Search Telma 40", "Amlodipine Generic", "BP Monitoring Tips"]
+
+    # C. Thyroid (Thyronorm / Levothyroxine)
+    elif any(k in m for k in ["thyroid", "thyronorm", "eltroxin", "levothyroxine", "tsh"]):
+        reply = (
+            "🦋 **THYROID (LEVOTHYROXINE) INSTRUCTIONS:**\n"
+            "• **The Strict Morning Rule:** Take your prescribed dose (Thyronorm / Eltroxin) **first thing in the morning on an empty stomach** with a full glass of plain water.\n"
+            "• Wait **at least 30 to 45 minutes** before having morning tea, coffee, milk, or breakfast!\n"
+            "• Calcium and iron supplements must have a **4-hour gap** from thyroid pills as they block thyroid hormone absorption.\n"
+            "• Get your serum TSH tested every 6–12 weeks to adjust dosage."
+        )
+        quick_replies = ["Search Thyronorm 50mcg", "Thyroid Test Info"]
+
+    # D. Vitamins (D3, B12, Calcium, Iron)
+    elif any(k in m for k in ["vitamin", "vitamin d", "d3", "b12", "neurobion", "calcium", "shelcal", "iron", "folic acid"]):
+        reply = (
+            "💊 **ESSENTIAL VITAMINS & MINERAL SUPPLEMENTS:**\n"
+            "• **Vitamin D3 (60,000 IU):** Take 1 sachet or capsule **once weekly for 8 weeks** strictly after a heavy/fatty meal or milk for optimal absorption.\n"
+            "• **Vitamin B12 (Neurobion Forte):** 1 tablet daily after food for nerve health, tingling sensations, and chronic fatigue.\n"
+            "• **Calcium (Shelcal 500):** Take after lunch or dinner. Do NOT take at the exact same time as iron supplements.\n"
+            "• **Iron (Orofer XT):** Take with vitamin C (lemon water / orange juice) on an empty stomach or light meal. Avoid taking with tea or coffee."
+        )
+        quick_replies = ["Vitamin D3 60K Price", "Neurobion Forte Stock", "Shelcal 500 Info"]
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 4. SAFETY RULES: PREGNANCY, ANTIBIOTIC AMR, GENERICS
+    # ═════════════════════════════════════════════════════════════════════════
+
+    # A. Pregnancy & Lactation Safety
+    elif any(k in m for k in ["pregnant", "pregnancy", "breastfeeding", "lactation", "safe in pregnancy"]):
+        reply = (
+            "🤰 **PREGNANCY & BREASTFEEDING MEDICATION SAFETY:**\n"
+            "• **Safe First-Line OTC:** **Paracetamol** is the safest drug for fever and headache across all trimesters.\n"
+            "• **FORBIDDEN IN 3rd TRIMESTER:** Avoid NSAIDs like **Ibuprofen (Combiflam)**, **Diclofenac**, and **Aspirin** (causes premature closure of ductus arteriosus and fetal complications).\n"
+            "• **Strictly Teratogenic (Avoid):** Retinoids (Isotretinoin), Tetracyclines, Statins, Warfarin.\n"
+            "• Always consult your OB/GYN doctor before starting ANY new drug during pregnancy."
+        )
+        quick_replies = ["Paracetamol 650mg", "Morning Sickness Doxylamine", "OB/GYN Consultation"]
+
+    # B. Antibiotics & AMR Stewardship
+    elif any(k in m for k in ["antibiotic", "amoxicillin", "augmentin", "azithromycin", "azithral", "ciprofloxacin"]):
+        reply = (
+            "🔬 **ANTIBIOTIC USAGE & ANTIMICROBIAL RESISTANCE (AMR):**\n"
+            "• **Antibiotics kill BACTERIA only** — they have ZERO effect on viral common colds, flu, Covid, or dengue!\n"
+            "• **Complete the Full Course:** Even if you feel 100% better after 2 days, ALWAYS finish the full 3–5 day course prescribed by your doctor.\n"
+            "• Stopping midway creates **Superbugs (Drug-Resistant Bacteria)** that standard antibiotics can no longer cure.\n"
+            "• Common antibiotics: **Augmentin 625** (Amoxicillin + Clavulanate), **Azithral 500** (Azithromycin 500mg)."
+        )
+        quick_replies = ["Augmentin 625 Price", "Azithral 500mg Stock", "Prescription Requirement"]
+
+    # C. Jan Aushadhi & Generic Substitutes
+    elif any(k in m for k in ["generic", "jan aushadhi", "substitute", "save money", "cheaper alternative", "salt name"]):
+        reply = (
+            "🏛️ **JAN AUSHADHI & AI GENERIC SUBSTITUTES:**\n"
+            "• **Identical Bio-Equivalence:** Generic medicines contain the **exact same active chemical ingredient (API)**, strength, safety, and therapeutic efficacy as expensive branded medicines.\n"
+            "• **Massive Savings:** Jan Aushadhi & verified generic alternatives save patients between **50% and 80%** on medicine bills!\n"
+            "• Examples:\n"
+            "  - Dolo 650 (Branded ₹ 31) ➔ Paracetamol 650mg (Generic ₹ 8.50)\n"
+            "  - Pan 40 (Branded ₹ 155) ➔ Pantoprazole 40mg (Generic ₹ 28.00)\n"
+            "  - Augmentin 625 (Branded ₹ 220) ➔ Amox-Clav 625 (Generic ₹ 65.00)\n\n"
+            "Use our **AI Generic Price Comparator** tool on the patient dashboard to compare prices instantly!"
+        )
+        quick_replies = ["Compare Generic Prices", "Jan Aushadhi Near Me", "Upload Rx for Generic Scan"]
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 5. LIVE MEDICINE DATABASE MATCHING
+    # ═════════════════════════════════════════════════════════════════════════
     else:
-        reply = "👋 Hi! I am **PharmaConnect AI Assistant**. I can help you find medicines, check dosage instructions, explain side effects, find generic substitutes, or guide you during medical emergencies. What health topic can I assist you with today?"
+        # Match against our live catalog database
+        matched_meds = [
+            med for med in meds
+            if med["name"].lower() in m
+            or med["generic_name"].lower() in m
+            or any(s.strip().lower() in m for s in med.get("symptoms", "").split(","))
+        ]
+
+        if matched_meds:
+            med_item = matched_meds[0]
+            rx_status = "⚠️ Doctor's Prescription Required (Schedule H)" if med_item.get("prescription_required") else "✅ Over The Counter (OTC)"
+            reply = (
+                f"💊 **{med_item['name']} ({med_item['generic_name']}):**\n"
+                f"• **Category:** {med_item.get('category', 'Pharmaceutical')}\n"
+                f"• **Standard Dosage:** {med_item.get('dosage', 'As advised by doctor')}\n"
+                f"• **Common Clinical Indications:** {med_item.get('symptoms', 'General health')}\n"
+                f"• **MRP Price:** ₹ {med_item.get('mrp', 0.0):.2f}\n"
+                f"• **Regulatory Status:** {rx_status}\n\n"
+                f"Would you like to locate nearby licensed medical stores with live stock or add **{med_item['name']}** to your order?"
+            )
+            quick_replies = [f"Search {med_item['name']}", "Find Nearby Pharmacy", "Check Generic Substitute"]
+        else:
+            reply = (
+                "👋 Hi! I am **PharmaBot AI**, your 24/7 Universal Healthcare & Drug Intelligence Assistant.\n\n"
+                "I am trained to help you with:\n"
+                "• **🚨 Emergency First Aid:** Heart attack, stroke, asthma, allergic reactions, snakebites, burns & CPR\n"
+                "• **💊 Universal Medicines:** Dosage, timing, side effects, precautions & food interactions\n"
+                "• **🏛️ Generic Substitutes:** Find affordable Jan Aushadhi equivalents and save up to 70%\n"
+                "• **🩺 Symptom Guidance:** Fever, headaches, acidity, infections, cough, diabetes & BP\n\n"
+                "What health topic or medicine question can I assist you with today?"
+            )
+            quick_replies = [
+                "🚨 Emergency SOS",
+                "🌡️ Fever & Dolo 650",
+                "🔥 Acidity & Pan 40",
+                "💊 Generic Substitutes",
+                "🫀 Chest Pain Protocol"
+            ]
 
     return {
         "status": "SUCCESS",
-        "reply": reply
+        "reply": reply,
+        "action": action,
+        "quick_replies": quick_replies
     }
+
+
+@app.post("/api/ai/chatbot")
+async def ai_chatbot_response(req: ChatRequest):
+    """Interactive AI Healthcare Assistant Chatbot with Universal Medical & Emergency Intelligence"""
+    try:
+        conn = db.get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM medicines")
+        meds = [dict(r) for r in c.fetchall()]
+        conn.close()
+    except Exception:
+        meds = []
+
+    res = get_universal_medical_ai_reply(req.message, req.user_role or "patient", meds)
+    return res
 
 
 

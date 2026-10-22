@@ -928,6 +928,27 @@ function toggleAIChatbotWindow() {
   if (win) win.classList.toggle('active');
 }
 
+function formatChatReply(text) {
+  if (!text) return "";
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="chat-link" style="color:var(--medical-blue); font-weight:700; text-decoration:underline;">$1</a>')
+    .replace(/\n/g, '<br>');
+}
+
+function quickChatQuestion(promptText) {
+  const input = document.getElementById('chatbotInput');
+  const win = document.getElementById('aiChatbotWindow');
+  if (win && !win.classList.contains('active')) {
+    win.classList.add('active');
+  }
+  if (input) {
+    input.value = promptText;
+    sendChatMessage();
+  }
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('chatbotInput');
   const text = input.value.trim();
@@ -942,7 +963,7 @@ async function sendChatMessage() {
 
   // Bot thinking indicator
   const thinkId = 'think-' + Date.now();
-  msgsDiv.innerHTML += `<div class="chat-msg bot" id="${thinkId}"><i class="fa-solid fa-spinner fa-spin"></i> Thinking...</div>`;
+  msgsDiv.innerHTML += `<div class="chat-msg bot" id="${thinkId}"><i class="fa-solid fa-spinner fa-spin"></i> Analyzing medical knowledge base...</div>`;
   msgsDiv.scrollTop = msgsDiv.scrollHeight;
 
   try {
@@ -955,7 +976,27 @@ async function sendChatMessage() {
     
     const thinkEl = document.getElementById(thinkId);
     if (thinkEl) {
-      thinkEl.innerHTML = data.reply.replace(/\n/g, '<br>');
+      let formatted = formatChatReply(data.reply);
+      if (data.action === 'OPEN_EMERGENCY_MODAL') {
+        formatted += `
+          <div style="margin-top: 10px;">
+            <button class="btn btn-emergency" onclick="openEmergencyModal()" style="width:100%; padding: 8px 12px; font-size: 13px; font-weight: 700; justify-content: center; box-shadow: 0 4px 14px rgba(244,63,94,0.4);">
+              <i class="fa-solid fa-truck-medical"></i> 🚨 Open Emergency Dispatch Now
+            </button>
+          </div>
+        `;
+      }
+      if (data.quick_replies && data.quick_replies.length > 0) {
+        formatted += `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">`;
+        data.quick_replies.forEach(qr => {
+          const isEmg = qr.includes("Emergency") || qr.includes("108") || qr.includes("Dispatch") || qr.includes("ICU");
+          const chipCls = isEmg ? "chatbot-chip emergency" : "chatbot-chip";
+          const safeQr = qr.replace(/'/g, "\\'");
+          formatted += `<button class="${chipCls}" onclick="quickChatQuestion('${safeQr}')">${qr}</button>`;
+        });
+        formatted += `</div>`;
+      }
+      thinkEl.innerHTML = formatted;
     }
     msgsDiv.scrollTop = msgsDiv.scrollHeight;
   } catch (err) {

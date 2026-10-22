@@ -458,24 +458,33 @@
   color: var(--medical-blue);
 }
 
-/* Floating AI Chatbot Widget */
+/* Floating AI Chatbot Widget - Positioned safely on the right above any bottom navigation */
 .chatbot-widget-container {
   position: fixed;
-  bottom: 24px;
-  left: 24px;
-  z-index: 1500;
+  bottom: 84px;
+  right: 20px;
+  left: auto;
+  z-index: 3100;
+}
+
+@media (min-width: 993px) {
+  .chatbot-widget-container {
+    bottom: 28px;
+    right: 28px;
+    left: auto;
+  }
 }
 
 .chatbot-toggle-btn {
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--purple-ai), var(--medical-blue));
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
   border: 2px solid white;
   cursor: pointer;
   position: relative;
@@ -500,20 +509,62 @@
 .chatbot-window {
   display: none;
   position: absolute;
-  bottom: 70px;
-  left: 0;
+  bottom: 68px;
+  right: 0;
+  left: auto;
   width: 360px;
   height: 480px;
+  max-width: calc(100vw - 28px);
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-lg);
   flex-direction: column;
   overflow: hidden;
+  z-index: 3200;
 }
 
 .chatbot-window.active {
   display: flex;
+}
+
+/* Quick Suggestion Chips for Universal Medical & Emergency Questions */
+.chatbot-quick-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border-color);
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+.chatbot-quick-chips::-webkit-scrollbar {
+  display: none;
+}
+.chatbot-chip {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.chatbot-chip:hover, .chatbot-chip:active {
+  background: var(--medical-blue-light);
+  color: var(--medical-blue);
+  border-color: var(--medical-blue);
+}
+.chatbot-chip.emergency {
+  background: #ffe4e6;
+  color: #e11d48;
+  border-color: #fecdd3;
+  font-weight: 700;
 }
 
 .chatbot-header {
