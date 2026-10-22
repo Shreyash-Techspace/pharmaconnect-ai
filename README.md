@@ -3,9 +3,12 @@
 # 💊 Pharma-Connect AI
 ### *Next-Generation Real-Time Healthcare & Intelligent Medicine Availability Platform*
 
+**Developed by [Shreyash Bhoir](https://github.com/Shreyash-Techspace)**
+
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-success?style=for-the-badge&logo=vercel&logoColor=white)](https://pharmaconnect-ai-hdgu.vercel.app/)
+[![Author](https://img.shields.io/badge/Author-Shreyash%20Bhoir-orange?style=for-the-badge&logo=github)](https://github.com/Shreyash-Techspace)
 [![SQLite](https://img.shields.io/badge/SQLite3-Database-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Deploy-Vercel%20%7C%20Render-black?style=for-the-badge&logo=vercel)](https://pharmaconnect-ai-hdgu.vercel.app/)
@@ -56,6 +59,7 @@
   - [Deploy to Render](#deploy-to-render)
   - [Deploy to Vercel](#deploy-to-vercel)
 - [Contributing](#-contributing)
+- [Author](#-author)
 - [License](#-license)
 
 ---
@@ -490,6 +494,16 @@ Contributions make the open-source community an incredible place to learn, inspi
 
 ---
 
+## 👨‍💻 Author
+
+**Shreyash Bhoir**
+- **GitHub**: [@Shreyash-Techspace](https://github.com/Shreyash-Techspace)
+- **Email**: [shreyashbhoir0501@gmail.com](mailto:shreyashbhoir0501@gmail.com)
+- **Project Repository**: [pharmaconnect-ai](https://github.com/Shreyash-Techspace/pharmaconnect-ai)
+- **Live Demo**: [pharmaconnect-ai-hdgu.vercel.app](https://pharmaconnect-ai-hdgu.vercel.app/)
+
+---
+
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
@@ -497,9 +511,10 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 <div align="center">
-  <p>Built with ❤️ to revolutionize accessible healthcare intelligence.</p>
+  <p>Built with ❤️ by <strong><a href="https://github.com/Shreyash-Techspace">Shreyash Bhoir</a></strong> to revolutionize accessible healthcare intelligence.</p>
   <p>
-    <strong>Pharma-Connect AI Team</strong> • 
-    <a href="mailto:support@pharmaconnect.ai">Contact Support</a>
+    <a href="mailto:shreyashbhoir0501@gmail.com">Contact Developer</a> • 
+    <a href="https://github.com/Shreyash-Techspace/pharmaconnect-ai">GitHub Repository</a> • 
+    <a href="https://pharmaconnect-ai-hdgu.vercel.app/">Live Web App</a>
   </p>
 </div>
